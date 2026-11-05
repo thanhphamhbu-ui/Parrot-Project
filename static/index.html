@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Parrot Workflow</title>
+<link rel="icon" href="/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,100..125,500..900;1,100..125,500..900&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Kanban by status (Chưa làm → Đang làm → Chờ duyệt → Xong); phone shows one column at a time with a bottom nav. Parrot palette: charcoal, canary, green, cobalt on melange grey. */
+:root {
+  --bg: #F2F2EE;
+  --surface: #FFFFFF;
+  --surface-2: #E8E8E2;
+  --ink: #1F1F1D;
+  --ink-2: #5A5B55;
+  --line: #D8D9D2;
+  --canary: #FCFD97;
+  --canary-line: #D6D86A;
+  --green: #31C48D;
+  --green-ink: #0E7650;
+  --cobalt: #0583F2;
+  --cobalt-ink: #0463B8;
+  --melange: #B8BAB5;
+  --late: #C73434;
+  --late-bg: #FBE6E4;
+  --primary: #1F1F1D;
+  --on-primary: #FCFD97;
+  --scrim: rgba(20, 20, 18, 0.42);
+  --logo-filter: none;
+  --logo-blend: multiply;
+  --display: "Archivo", "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  --body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131312; --surface: #1D1D1B; --surface-2: #2A2A27; --ink: #F1F1EC; --ink-2: #ABACA5; --line: #393934;
+    --canary-line: #B9BB50; --green: #3FD39C; --green-ink: #6BE3B6; --cobalt: #3A9DFF; --cobalt-ink: #86C3FF;
+    --melange: #8E908A; --late: #FF7B72; --late-bg: #3A1F1D; --primary: #FCFD97; --on-primary: #1F1F1D;
+    --scrim: rgba(0, 0, 0, 0.6); --logo-filter: invert(1); --logo-blend: screen;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131312; --surface: #1D1D1B; --surface-2: #2A2A27; --ink: #F1F1EC; --ink-2: #ABACA5; --line: #393934;
+  --canary-line: #B9BB50; --green: #3FD39C; --green-ink: #6BE3B6; --cobalt: #3A9DFF; --cobalt-ink: #86C3FF;
+  --melange: #8E908A; --late: #FF7B72; --late-bg: #3A1F1D; --primary: #FCFD97; --on-primary: #1F1F1D;
+  --scrim: rgba(0, 0, 0, 0.6); --logo-filter: invert(1); --logo-blend: screen;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; -webkit-text-size-adjust: 100%; }
+img { max-width: 100%; }
+
+/* login */
+.login { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: grid; place-items: center; padding: 24px 16px; }
+.login-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.login-card img { height: 36px; width: auto; filter: var(--logo-filter); mix-blend-mode: var(--logo-blend); }
+.login-card h1 { font-size: 26px; }
+.login-card p { font-size: 13.5px; color: var(--ink-2); }
+.login-card .err { font-size: 13px; }
+#gbtn { min-height: 44px; }
+.devform { display: flex; gap: 8px; width: 100%; }
+.me { display: inline-flex; align-items: center; gap: 8px; }
+.me img { width: 26px; height: 26px; border-radius: 50%; }
+.linkbtn { border: 0; background: none; color: var(--cobalt-ink); font-weight: 600; cursor: pointer; padding: 4px 2px; font-size: 12.5px; }
+.mlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.mlist li { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px; word-break: break-all; }
+.madd { display: flex; gap: 8px; }
+.madd .btn { min-height: 40px; }
+h1, h2, h3 { font-family: var(--display); font-style: italic; font-stretch: 125%; font-weight: 800; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-in { max-width: 1440px; margin: 0 auto; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); display: flex; align-items: center; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand img { height: 24px; width: auto; filter: var(--logo-filter); mix-blend-mode: var(--logo-blend); }
+.brand .sep { width: 1px; height: 22px; background: var(--line); }
+.brand b { font-family: var(--display); font-style: italic; font-stretch: 125%; font-weight: 800; font-size: 17px; white-space: nowrap; }
+.nav { display: flex; gap: 2px; margin-left: 12px; }
+.nav button { border: 0; background: none; padding: 8px 12px; border-radius: 8px; font-weight: 600; color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.nav button[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.nav svg { width: 18px; height: 18px; flex: none; }
+.spacer { flex: 1; }
+.plan { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+.plan button { border: 0; background: none; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; cursor: pointer; color: var(--ink-2); white-space: nowrap; }
+.plan button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+
+.wrap { max-width: 1440px; margin: 0 auto; padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+.intro { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; }
+.intro h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.05; }
+.intro .sub { color: var(--ink-2); font-size: 13.5px; margin-top: 4px; max-width: 70ch; }
+.role { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.role b { font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+
+/* attention strip */
+.attn { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.attn::-webkit-scrollbar { display: none; }
+.pillbtn { flex: none; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.pillbtn .n { font-family: var(--display); font-weight: 800; font-size: 15px; }
+.pillbtn.review { background: var(--canary); border-color: var(--canary-line); color: #1F1F1D; }
+.pillbtn.late { background: var(--late-bg); border-color: var(--late); color: var(--late); }
+.pillbtn.gate .dia { width: 10px; height: 10px; transform: rotate(45deg); background: var(--ink); }
+.pillbtn[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+
+/* filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 6px 11px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink-2); white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+select { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.flabel { font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 8px; }
+
+/* board */
+.coltabs { display: none; }
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.col { background: var(--surface-2); border-radius: var(--r); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.colhead { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; }
+.colhead h2 { font-size: 15px; }
+.colhead .c { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.sdot { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.18); }
+.s-todo { background: var(--melange); } .s-doing { background: var(--cobalt); } .s-review { background: var(--canary); } .s-done { background: var(--green); }
+.empty { font-size: 13px; color: var(--ink-2); padding: 14px 6px; text-align: center; }
+
+.card { display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; cursor: pointer; }
+.card:hover { border-color: var(--ink-2); }
+.card .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
+.lane { font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 5px; padding: 0 5px; line-height: 16px; color: var(--ink); }
+.card .t { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.card .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.card .due { margin-right: auto; }
+.card.done .t { color: var(--ink-2); }
+.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; line-height: 18px; }
+.tag.late { background: var(--late-bg); color: var(--late); }
+.tag.soon { background: var(--canary); color: #1F1F1D; }
+.tag.block { border: 1px dashed var(--ink-2); color: var(--ink-2); }
+.tag.link { color: var(--cobalt-ink); }
+.tag svg { width: 12px; height: 12px; }
+
+/* gates */
+.gates { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.gcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gcard .gh { display: flex; gap: 14px; align-items: center; }
+.gmark { width: 40px; height: 40px; flex: none; display: grid; place-items: center; position: relative; }
+.gmark::before { content: ""; position: absolute; inset: 6px; transform: rotate(45deg); background: var(--ink); border-radius: 3px; }
+.gmark i { position: relative; font-style: normal; font-family: var(--display); font-weight: 800; font-size: 12px; color: var(--bg); }
+.gmark.go::before { background: var(--green); } .gmark.adj::before { background: var(--canary); } .gmark.no::before { background: var(--late); }
+.gmark.go i, .gmark.adj i { color: #1F1F1D; }
+.gcard h3 { font-size: 18px; }
+.gcard ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.dec { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12.5px; }
+.dec div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.dec b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 2px; }
+.dec .g b { color: var(--green-ink); } .dec .n b { color: var(--late); }
+.decrow { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13px; }
+.gnote { font-size: 13px; color: var(--ink-2); max-width: 80ch; }
+
+/* schedule */
+.weeks { display: flex; flex-direction: column; gap: 12px; }
+.wk { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.wk.now { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.wkh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px; background: var(--surface-2); }
+.wkh h3 { font-size: 16px; }
+.wkh .d { font-size: 12.5px; color: var(--ink-2); }
+.wkh .now-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; background: var(--primary); color: var(--on-primary); padding: 1px 8px; border-radius: 999px; }
+.wkh .tet { font-size: 12px; font-weight: 600; color: var(--late); }
+.wrow { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; padding: 10px 14px; cursor: pointer; }
+.wrow:hover { background: var(--surface-2); }
+.wrow .t { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; }
+.wrow .r { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.wrow.meet { cursor: default; color: var(--ink-2); font-size: 13px; }
+.wrow.meet:hover { background: none; }
+
+/* rules */
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.rules section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rules h2 { font-size: 19px; }
+.rules ol, .rules ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.flow span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); }
+.team { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.team label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; }
+input[type="text"], input[type="url"], textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%; }
+input:disabled { color: var(--ink-2); background: var(--surface-2); }
+textarea { min-height: 72px; resize: vertical; }
+.syncnote { font-size: 12.5px; color: var(--ink-2); }
+
+/* sheet */
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 40; }
+.panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface); z-index: 41; overflow-y: auto; padding: calc(16px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: -12px 0 40px rgba(0, 0, 0, 0.18); }
+.phead { display: flex; align-items: center; gap: 10px; }
+.close { margin-left: auto; border: 0; background: var(--surface-2); border-radius: 999px; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.close svg { width: 18px; height: 18px; }
+.panel h2 { font-size: 22px; line-height: 1.15; }
+.kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 6px 12px; font-size: 13.5px; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; }
+.box { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.box h4 { margin: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
+.box.state { background: var(--surface); border: 1px solid var(--line); }
+.srow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-weight: 700; }
+.sub a { color: var(--cobalt-ink); font-weight: 600; word-break: break-all; }
+.linklist { display: flex; flex-wrap: wrap; gap: 6px; }
+.lchip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; text-align: left; }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1.5px solid var(--ink); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 0 16px; min-height: 44px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.btn.ok { background: var(--green); border-color: var(--green); color: #0B2A1E; }
+.btn.bad { border-color: var(--late); color: var(--late); }
+.err { font-size: 12.5px; color: var(--late); font-weight: 600; }
+.err:empty { display: none; }
+.hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 12.5px; }
+.hist li { padding-left: 12px; position: relative; }
+.hist li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-2); }
+.hist .note { display: block; color: var(--ink); }
+
+/* bottom nav (phone) */
+.bnav { display: none; }
+
+@media (max-width: 860px) {
+  .nav { display: none; }
+  .brand b { font-size: 15px; }
+  .bnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  .bnav button { flex: 1; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; font-size: 11px; font-weight: 600; color: var(--ink-2); cursor: pointer; border-radius: 10px; min-height: 48px; }
+  .bnav button[aria-current="page"] { color: var(--ink); background: var(--surface-2); }
+  .bnav svg { width: 22px; height: 22px; }
+  .wrap { padding-block: 14px calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .coltabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; background: var(--surface-2); border-radius: 12px; padding: 4px; position: sticky; top: calc(52px + env(safe-area-inset-top, 0px)); z-index: 10; }
+  .coltabs button { border: 0; background: none; border-radius: 9px; padding: 7px 2px; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px; min-height: 48px; }
+  .coltabs button b { font-family: var(--display); font-size: 17px; font-weight: 800; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  .coltabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+  .board { grid-template-columns: 1fr; }
+  .col { background: none; padding: 0; }
+  .col:not(.on) { display: none; }
+  .colhead { display: none; }
+  .card { padding: 13px 14px; }
+  .dec { grid-template-columns: 1fr; }
+  .panel { top: auto; width: 100%; max-height: 92%; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2); }
+}
+@media (max-width: 420px) {
+  .brand .sep, .brand b { display: none; }
+  .plan button { padding: 6px 10px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .panel { animation: sheetin 0.2s ease-out; }
+  @keyframes sheetin { from { transform: translateY(16px); opacity: 0.5; } to { transform: none; opacity: 1; } }
+}
+</style>
+</head>
+<body>
+
+<div class="login" id="login" hidden>
+  <div class="login-card">
+    <img src="/logo.jpg" alt="Parrot">
+    <h1>Workflow</h1>
+    <p>Đăng nhập bằng tài khoản Google mà Project Manager đã thêm vào danh sách thành viên.</p>
+    <div id="gbtn"></div>
+    <form class="devform" id="devform" hidden>
+      <input type="text" id="devemail" placeholder="email@vidu.com" aria-label="Email đăng nhập thử">
+      <button type="submit" class="btn primary">Vào</button>
+    </form>
+    <p class="err" id="loginerr" role="alert"></p>
+  </div>
+</div>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><img src="logo.jpg" alt="Parrot"><span class="sep" aria-hidden="true"></span><b>Workflow</b></div>
+    <nav class="nav" aria-label="Chế độ xem" id="nav"></nav>
+    <span class="spacer"></span>
+    <div class="plan" role="group" aria-label="Chọn lộ trình">
+      <button type="button" id="planA" aria-pressed="true" title="Launch sau Tết">Plan A</button>
+      <button type="button" id="planB" aria-pressed="false" title="Bán trước Tết">Plan B</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <div>
+      <h1 id="vtitle">Bảng việc</h1>
+      <p class="sub" id="plannote"></p>
+    </div>
+    <p class="role" id="role"><span id="syncnote">Đang tải dữ liệu của team…</span></p>
+  </div>
+
+  <section data-v="bang" style="display:flex;flex-direction:column;gap:14px">
+    <div class="attn" id="attn"></div>
+    <div class="filters">
+      <div class="chips" id="lanechips" role="group" aria-label="Lọc theo bộ phận"></div>
+      <label class="flabel" for="range">Thời gian
+        <select id="range"></select>
+      </label>
+    </div>
+    <div class="coltabs" id="coltabs" role="group" aria-label="Chọn cột trạng thái"></div>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section data-v="cong" hidden style="display:flex;flex-direction:column;gap:14px">
+    <p class="gnote">Project Manager chốt mỗi cổng trong buổi họp thứ Sáu. Ngưỡng số là giả định minh họa từ unit economics (giá 400k, giá vốn 140k, biên đóng góp 170k), cần thay bằng số thật ở bước D01. <b>Go</b> khi đạt ngưỡng; <b>Điều chỉnh</b> khi đạt 70–100% ngưỡng (tối đa hai vòng); <b>No-go</b> khi dưới 70% sau hai vòng hoặc chạm ngưỡng lỗ tối đa.</p>
+    <div class="gates" id="gates"></div>
+  </section>
+
+  <section data-v="lich" hidden style="display:flex;flex-direction:column;gap:12px">
+    <p class="gnote">Hạn nộp đầu ra theo từng tuần, cùng cổng quyết định và họp review thứ Sáu. Kỳ nghỉ Tết dự kiến 4–10/2/2027; lịch nghỉ chính thức chưa công bố.</p>
+    <div class="weeks" id="weeks"></div>
+  </section>
+
+  <section data-v="quytac" hidden>
+    <div class="rules">
+      <section>
+        <h2>Luồng duyệt một đầu ra</h2>
+        <div class="flow">
+          <span><i class="sdot s-todo"></i>Chưa làm</span>→<span><i class="sdot s-doing"></i>Đang làm</span>→<span><i class="sdot s-review"></i>Chờ duyệt</span>→<span><i class="sdot s-done"></i>Xong</span>
+        </div>
+        <ol>
+          <li>Người phụ trách dán <b>link đầu ra</b> (bắt buộc) và bấm <b>Nộp chờ duyệt</b>.</li>
+          <li>Chỉ Project Manager thấy nút <b>Duyệt</b> và <b>Trả về</b>. Project Manager duyệt trong <b>24 giờ</b>; trả về phải kèm ghi chú, việc quay lại <b>Đang làm</b>.</li>
+          <li>Mọi lần đổi trạng thái được ghi vào lịch sử của việc: ai, lúc nào, link, ghi chú.</li>
+          <li>Việc nộp sau 12h thứ Năm được duyệt luôn trong buổi họp thứ Sáu.</li>
+          <li>Việc đang chờ một việc khác chưa xong: ghi rõ ở họp thứ Sáu, không tự đổi hạn.</li>
+        </ol>
+      </section>
+      <section>
+        <h2>Họp review chiều thứ Sáu</h2>
+        <ul>
+          <li>Mỗi bộ phận 5 phút: xong gì, đầu ra nào chờ duyệt, vướng gì.</li>
+          <li>Data trình bảng số tuần, so với ngưỡng.</li>
+          <li>Project Manager chốt đầu ra còn lại, giao việc tuần sau; ở tuần có cổng, ra quyết định Go / Điều chỉnh / No-go.</li>
+          <li>Ngày lễ: họp 1/1/2027 dời sang thứ Năm 31/12; bỏ họp 5/2/2027 (Tết).</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Đội ngũ</h2>
+        <p class="muted" style="font-size:13px">Project Manager điền tên người phụ trách mỗi bộ phận.</p>
+        <div class="team" id="team"></div>
+        <p class="syncnote" id="teamnote"></p>
+      </section>
+      <section id="members" hidden>
+        <h2>Thành viên được đăng nhập</h2>
+        <p class="muted" style="font-size:13px">Thêm email Google của từng người trong team. Người chưa có trong danh sách sẽ không vào được trang.</p>
+        <form class="madd" id="maddform">
+          <input type="text" id="memail" inputmode="email" autocomplete="off" placeholder="ten@gmail.com" aria-label="Email thành viên mới">
+          <button type="submit" class="btn primary">Thêm</button>
+        </form>
+        <p class="err" id="merr" role="alert"></p>
+        <ul class="mlist" id="mlist"></ul>
+      </section>
+      <section>
+        <h2>Giả định cần kiểm lại</h2>
+        <ul>
+          <li>Làm mẫu 1–2 tuần, sản xuất lô nhỏ 3–4 tuần, xưởng ngưng nhận đơn khoảng 3 tuần trước Tết (khoảng 15/1/2027). Xác nhận bằng văn bản ở bước P01 và P06.</li>
+          <li>Mùng 1 Tết Đinh Mùi là thứ Bảy 6/2/2027; kỳ nghỉ 4–10/2 là dự kiến.</li>
+          <li>Lô nhỏ đầu tiên khoảng 300 sản phẩm. Ngân sách tham khảo khoảng 114 triệu đồng, gồm 47 triệu tiền hàng và 10% dự phòng, chưa gồm lương team.</li>
+          <li>Ngưỡng CPL 8,5k, CAC 85k là minh họa từ giá 400k, giá vốn 140k.</li>
+          <li>Mỗi bộ phận một người: tuần 2–4 Marketing tải nặng nhất (phỏng vấn + khảo sát), Sales hỗ trợ hẹn lịch phỏng vấn.</li>
+          <li>Cỡ mẫu khảo sát 300–400 đang chờ Project Manager chốt (giữ hay tăng lên 600).</li>
+        </ul>
+      </section>
+    </div>
+  </section>
+</main>
+
+<nav class="bnav" id="bnav" aria-label="Chế độ xem"></nav>
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" hidden aria-modal="true" role="dialog" aria-labelledby="ptitle"></aside>
+
+<script>
+const START = "2026-11-09", WEEKS = 20; // tuần 1 = tuần có ngày kick-off 12/11/2026
+const LANES = [
+  { k: "F", name: "Project Manager", code: "PM", full: "Project Manager (lead, duyệt)" },
+  { k: "M", name: "Marketing", code: "MKT", full: "Marketing / Brand" },
+  { k: "S", name: "Sales-Ecom", code: "SALES", full: "Sales-Ecom" },
+  { k: "P", name: "Production", code: "PROD", full: "Production / R&D / Sourcing" },
+  { k: "D", name: "Finance-Data", code: "DATA", full: "Finance-Data" },
+];
+const PHASES = {
+  P1: "Phần 1 · Research",
+  T1: "Tầng 1 · Smoke test",
+  T2: "Tầng 2 · Pre-order có cọc",
+  PR: "Sản xuất lô nhỏ",
+  T3: "Tầng 3–4 · Soft launch + wear-test",
+  T2B: "Tầng 2 · Pre-order + sản xuất lô",
+};
+const PLANNOTE = {
+  A: "Dự án bắt đầu T5 12/11/2026. Plan A · launch sau Tết. Đặt lô sau cổng C2 (8/1), trước hạn xưởng ngưng nhận đơn khoảng 15/1. Soft launch từ 22/2, quyết định mở rộng ở C3 ngày 26/3/2027.",
+  B: "Dự án bắt đầu T5 12/11/2026. Plan B · bán trước Tết. Đặt lô ngay sau C1 (25/12) khi chưa có dữ liệu cọc. Bán 25/1–3/2, wear-test sau Tết, C3 ngày 12/3/2027. Chỉ chọn khi xưởng xác nhận lịch và MOQ.",
+};
+
+// t: [id, lane, plan(AB|A|B), phase, start, end, title, how, output, deps]
+const T = [
+  ["F01","F","AB","P1","2026-11-12","2026-11-13","Kick-off, phê duyệt kế hoạch và ngân sách","Chốt câu hỏi nghiên cứu và 5 giả thuyết, 1–2 sản phẩm vào cửa dự kiến, ngân sách research + test (dùng bảng ngân sách tham khảo), đặt ngưỡng lỗ tối đa bằng một con số tiền.","Biên bản kick-off: giả thuyết, sản phẩm vào cửa, ngân sách duyệt, ngưỡng lỗ tối đa",[]],
+  ["M01","M","AB","P1","2026-11-12","2026-11-18","Thiết kế công cụ nghiên cứu","Kịch bản phỏng vấn sâu, bảng hỏi khảo sát (có 4 câu Van Westendorp), tiêu chí tuyển người. Nguồn tuyển: CLB chạy, Strava, nhóm Facebook, giải chạy.","Kịch bản phỏng vấn + bảng hỏi đã chạy thử với 3 người",["F01"]],
+  ["D01","D","AB","P1","2026-11-12","2026-11-18","Unit economics và ngưỡng quyết định","Giá 400k, giá vốn 140k, phí sàn ~60k, đổi trả ~30k → biên đóng góp 170k; CAC trần 85k; CPL trần 8,5k (10% đăng ký thành đơn). Ngưỡng Go / Điều chỉnh / No-go cho từng giả thuyết.","Sheet unit economics + bảng ngưỡng cho 5 giả thuyết",["F01"]],
+  ["P01","P","AB","P1","2026-11-12","2026-11-18","Lấy báo giá từ 2 xưởng","Gửi brief 1–2 sản phẩm vào cửa. Hỏi giá mẫu, MOQ, thời gian làm mẫu (1–2 tuần) và lô (3–4 tuần), ngày ngưng nhận đơn trước Tết, lịch nghỉ Tết của xưởng.","Bảng so sánh 2 xưởng: giá, MOQ, lead time, lịch Tết",["F01"]],
+  ["S01","S","AB","P1","2026-11-12","2026-11-25","Quét đối thủ trên sàn TMĐT","Shopee, Lazada, TikTok Shop: 15–20 sản phẩm bán chạy mỗi nhóm (quần, áo, nón, đai) với giá, lượt bán, chất liệu. Đọc review 1–3 sao của ít nhất 10 sản phẩm mỗi nhóm.","Bảng đối thủ + danh sách lời phàn nàn theo nhóm sản phẩm",[]],
+  ["D02","D","AB","P1","2026-11-16","2026-11-25","Desk research và quy mô thị trường","Số giải chạy, lượng VĐV đăng ký, Google Trends, báo cáo ngành. Ước lượng top-down và bottom-up cho 4 nhóm sản phẩm, ghi nguồn từng số.","Bảng quy mô thị trường (TAM/SAM/SOM) có nguồn",[]],
+  ["M02","M","AB","P1","2026-11-19","2026-12-04","Phỏng vấn sâu 26–30 runner","Khoảng 12 người mỗi tuần trong 2,5 tuần: 10 road, 10 trail, 6–10 chạy cả hai. Sales hỗ trợ hẹn lịch. Ghi âm (xin phép), mã hóa insight ngay trong ngày.","Ghi chú từng buổi + bảng mã hóa insight",["M01"]],
+  ["M03","M","AB","P1","2026-11-19","2026-12-04","Khảo sát định lượng 300–400 phản hồi","Phát qua CLB, nhóm Facebook, Strava; quà bốc thăm. Theo dõi số phản hồi theo phân khúc mỗi ngày để cân mẫu. Cỡ mẫu đang chờ Project Manager chốt (300 hay 600).","Dữ liệu thô đủ cỡ mẫu, đã làm sạch",["M01"]],
+  ["P02","P","AB","P1","2026-11-19","2026-11-25","Chốt xưởng và tech pack v1","Chọn 1 xưởng chính + 1 dự phòng. Tech pack sơ bộ cho 1–2 sản phẩm vào cửa, đặt làm mẫu.","Tech pack v1, xác nhận giá mẫu và lịch giao mẫu",["P01"]],
+  ["S02","S","AB","P1","2026-11-26","2026-12-02","Quan sát thực địa và quảng cáo đối thủ","Decathlon, cửa hàng chạy bộ, expo giải chạy: cầm, thử, ghi chú chất lượng. Xem Meta Ad Library. Tiếp tục hỗ trợ hẹn lịch phỏng vấn.","Ảnh + ghi chú chất lượng, giá, thông điệp đối thủ",["S01"]],
+  ["P03","P","AB","P1","2026-11-26","2026-12-04","Làm mẫu vòng 1 và chạy thử nội bộ","Mẫu 1–2 tuần. Team chạy thử road và trail, ghi lỗi fit, ma sát, thoát mồ hôi, độ nảy của đai.","Mẫu v1 + phiếu đánh giá chạy thử",["P02"]],
+  ["D03","D","AB","P1","2026-11-26","2026-12-04","Chọn analog và dự báo ban đầu","Ít nhất 5 analog, gồm cả brand thất bại. Chuẩn hóa doanh số theo tháng sau ra mắt, gán trọng số w, hệ số giá, kênh, quảng cáo, sản phẩm.","Dự báo analog D_t theo tháng (prior)",["D01","S01"]],
+  ["M05","M","AB","P1","2026-12-02","2026-12-11","Dựng landing page và quảng cáo smoke test","3 concept thông điệp, 2 mức giá để A/B, pixel và form đăng ký. Dựng khung từ 2/12; điền thông điệp khi có persona (M04, 9/12) và ảnh mẫu v2 (P04, 11/12).","Landing page + bộ quảng cáo sẵn sàng chạy",["M01"]],
+  ["M04","M","AB","P1","2026-12-07","2026-12-09","Tổng hợp insight và chân dung khách","Gom bảng mã hóa phỏng vấn thành 2–3 phân khúc, top nỗi đau theo từng sản phẩm, thông điệp cần test.","2–3 persona + danh sách thông điệp cần test",["M02"]],
+  ["D04","D","AB","P1","2026-12-07","2026-12-10","Phân tích khảo sát, báo cáo tổng hợp Phần 1","Phân khúc, mức giá chấp nhận (Van Westendorp), sai số theo cỡ mẫu; ghép với insight, đối thủ, quy mô và analog.","Báo cáo tổng hợp gửi Project Manager trước 17h thứ Năm 10/12",["M03","M04","D02","D03","S02"]],
+  ["P04","P","AB","P1","2026-12-07","2026-12-11","Mẫu vòng 2, ảnh sản phẩm, chốt giá vốn","Sửa mẫu theo phiếu chạy thử và insight; chụp ảnh hoặc dựng mockup cho landing; chốt giá vốn với xưởng.","Mẫu v2, bộ ảnh cho landing, giá vốn chốt",["P03"]],
+  ["S03","S","AB","P1","2026-12-07","2026-12-11","Chuẩn bị gian hàng và kịch bản chăm lead","Đăng ký shop Shopee / TikTok Shop, chính sách cọc và hoàn cọc, mẫu tin nhắn chăm lead.","Shop + chính sách cọc + kịch bản tin nhắn",[]],
+  ["M06","M","AB","T1","2026-12-14","2026-12-25","Chạy smoke test","Chạy quảng cáo theo ngân sách tầng 1. Đo CTR, tỷ lệ đăng ký, CPL theo concept và mức giá; cần 30–50 đăng ký mỗi biến thể.","Báo cáo smoke test mỗi thứ Năm",["M05","C0"]],
+  ["S04","S","AB","T1","2026-12-14","2026-12-25","Chăm lead đăng ký","Nhắn xác nhận nhu cầu, size, lý do chưa mua; ghi vào sheet lead.","Sheet lead có phân loại và lý do",["S03","C0"]],
+  ["D05","D","AB","T1","2026-12-14","2026-12-25","Dashboard tuần, so với ngưỡng","Cập nhật CPL, tỷ lệ đăng ký so với ngưỡng 8,5k; tính sai số theo cỡ mẫu; đề xuất Go / Điều chỉnh cho C1.","Dashboard tuần + đề xuất cho C1",["D01","C0"]],
+  ["P05","P","AB","T1","2026-12-14","2026-12-25","Tech pack v2, bảng size, giữ slot xưởng","Hoàn thiện tech pack và bảng size; giữ tạm slot sản xuất. Plan B: chuẩn bị nguyên liệu để đặt lô ngay sau C1.","Tech pack v2, bảng size, slot sản xuất tạm giữ",["P04"]],
+  ["M07","M","AB","T2","2026-12-28","2027-01-08","Mở pre-order có cọc + seeding CLB","Mời danh sách đăng ký, 2–3 CLB, KOL nhỏ; giới hạn số lượng; giữ A/B 2 mức giá.","Báo cáo cọc theo kênh và mức giá",["C1"]],
+  ["S05","S","AB","T2","2026-12-28","2027-01-08","Nhận cọc, xác nhận size","Nhận cọc, xác nhận size và màu, gửi xác nhận ngày giao dự kiến theo plan đang chạy.","Danh sách cọc theo SKU / size",["C1"]],
+  ["D06","D","AB","T2","2026-12-28","2027-01-08","Hiệu chỉnh dự báo bằng trọng số Z","Z = n / (n + 30); dự báo cuối = Z × số test + (1 − Z) × analog; dải thấp – cơ sở – cao. Quy đổi cọc sang đơn thật.","Dải dự báo + cỡ lô đề xuất theo SKU",["D03","C1"]],
+  ["P06","P","A","T2","2026-12-28","2027-01-08","Chốt lệnh sản xuất với xưởng","Xác nhận ngày nhận đơn cuối (khoảng 15/1), lịch nghỉ Tết, nguyên liệu; chuẩn bị đặt lô ngay sau C2.","Lịch sản xuất xác nhận bằng văn bản",["P05","C1"]],
+  ["P07","P","A","PR","2027-01-11","2027-02-12","Sản xuất lô nhỏ ~300 sản phẩm","Đặt lô trong 11–15/1 (trước hạn ngưng nhận đơn). Sản xuất 3–4 tuần, cộng nghỉ Tết của xưởng. QC giữa chuyền.","Hàng hoàn thành theo SKU / size",["C2"]],
+  ["M08","M","A","PR","2027-01-11","2027-02-03","Nuôi cộng đồng, tuyển 15–20 wear-tester","Nội dung chờ ra mắt cho danh sách đăng ký và khách cọc; tuyển 15–20 runner dùng thử 2–4 tuần.","Danh sách wear-tester + lịch nội dung đến ngày ra mắt",["C2"]],
+  ["D07","D","A","PR","2027-01-11","2027-01-29","Kế hoạch tồn kho và dòng tiền lô 1","Phân bổ 300 sản phẩm theo SKU/size từ dữ liệu cọc; dòng tiền đến khi bán hết; điểm hòa vốn lô.","Bảng phân bổ tồn kho + dòng tiền lô 1",["D06","C2"]],
+  ["P08","P","A","PR","2027-02-15","2027-02-19","Nhận hàng, QC, nhập kho","Kiểm 100% đường may lỗi nặng, kiểm ngẫu nhiên size; nhập kho theo SKU.","Biên bản QC + tồn kho thực tế",["P07"]],
+  ["S06","S","A","PR","2027-02-15","2027-02-19","Lên sàn, giao hàng cho khách cọc","Đăng listing Shopee / TikTok Shop, giao đơn cọc trước, nhắn khách hẹn review.","Listing live + đơn cọc đã giao",["P08"]],
+  ["M09","M","A","T3","2027-02-22","2027-03-26","Soft launch: quảng cáo và nội dung","Chạy quảng cáo với trần CAC 85k; nội dung từ wear-tester; theo dõi theo tuần.","Báo cáo CAC, chuyển đổi mỗi thứ Năm",["S06"]],
+  ["S07","S","A","T3","2027-02-22","2027-03-26","Bán hàng, CSKH, đổi trả","Xử lý đơn, đổi size, đổi trả; thu review; ghi lý do đổi trả.","Báo cáo đơn, đổi trả, review theo tuần",["S06"]],
+  ["P09","P","A","T3","2027-02-22","2027-03-26","Wear-test 15–20 runner","Giao sản phẩm cho wear-tester, theo dõi 2–4 tuần; tổng hợp lỗi và đề xuất sửa cho lô 2.","Phiếu đánh giá, danh sách lỗi, đề xuất lô 2",["P08","M08"]],
+  ["D08","D","A","T3","2027-02-22","2027-03-25","Báo cáo tuần, cập nhật Z và dải dự báo","Đơn thật mỗi tuần, CAC, đổi trả, mua lại; cập nhật Z và dải; so điểm hòa vốn.","Dashboard tuần + báo cáo C3 trước 17h 25/3",["D06"]],
+  ["P06B","P","B","T2B","2026-12-28","2027-01-22","Đặt và sản xuất lô nhỏ ngay sau C1","Đặt lô ngày 28/12 khi chưa có dữ liệu cọc (rủi ro cỡ lô). Sản xuất 3–4 tuần, có nghỉ Tết dương lịch; QC giữa chuyền.","Hàng hoàn thành khoảng 22/1/2027",["P05","C1"]],
+  ["S06B","S","B","T2B","2027-01-18","2027-01-22","Chuẩn bị lên sàn","Listing, ảnh thật, chính sách giao trước Tết; hỏi hãng vận chuyển ngày nhận đơn cuối.","Listing sẵn sàng + lịch ngưng giao trước Tết",["S05"]],
+  ["D07B","D","B","T2B","2027-01-18","2027-01-22","Đối chiếu cọc với lô đã đặt","So cọc theo SKU/size với số lượng đã sản xuất; đề xuất phân bổ và giá bán.","Bảng phân bổ tồn kho + cảnh báo thừa/thiếu size",["D06"]],
+  ["M09B","M","B","T3","2027-01-25","2027-02-03","Bán trước Tết: quảng cáo + quà Tết","Chạy quảng cáo trần CAC 85k, góc quà Tết cho runner; ngưng khoảng 3/2.","Báo cáo CAC, chuyển đổi mỗi thứ Năm",["C2B"]],
+  ["S07B","S","B","T3","2027-01-25","2027-02-03","Giao đơn cọc, bán hàng, CSKH","Giao đơn cọc trước; bán qua sàn và cộng đồng; ngưng giao theo lịch hãng vận chuyển.","Báo cáo đơn, đổi trả, review theo tuần",["C2B"]],
+  ["M08B","M","B","T3","2027-01-25","2027-02-02","Tuyển 15–20 wear-tester","Chọn từ khách cọc và CLB; giao sản phẩm trước Tết để chạy sau Tết.","Danh sách wear-tester đã nhận hàng",["C2B"]],
+  ["D08B","D","B","T3","2027-01-25","2027-03-11","Báo cáo tuần, cập nhật Z và dải dự báo","Đơn thật, CAC, đổi trả; lưu ý mùa Tết làm số trước Tết cao bất thường.","Dashboard tuần + báo cáo C3 trước 17h 11/3",["D06"]],
+  ["P09B","P","B","T3","2027-02-15","2027-03-05","Wear-test 15–20 runner sau Tết","Theo dõi 2–4 tuần, tổng hợp lỗi, đề xuất sửa cho lô 2.","Phiếu đánh giá + đề xuất lô 2",["M08B"]],
+  ["S08B","S","B","T3","2027-02-15","2027-03-11","Bán tiếp sau Tết","Bán phần tồn còn lại, đo mua lại từ khách trước Tết.","Báo cáo đơn và mua lại",["S07B"]],
+];
+// gates: [id, plan, date, code, title, preparedBy, inputs[], go, adj, no]
+const G = [
+  ["C0","AB","2026-12-11","C0","Kết thúc research, mở test","D04 (Data) + Marketing",["Báo cáo tổng hợp Phần 1","Persona và thông điệp cần test","Mẫu v2, giá vốn chốt","Landing + quảng cáo sẵn sàng"],"Có phân khúc rõ, giá chấp nhận nằm trên mức cho biên mục tiêu → chạy tầng 1","Insight mâu thuẫn hoặc giá chấp nhận thấp hơn mục tiêu → sửa concept/giá, thêm 1 tuần","Không thấy nhu cầu đủ lớn ở cả 4 nhóm → dừng, xem lại sản phẩm vào cửa"],
+  ["C1","AB","2026-12-25","C1","Sau smoke test: mở pre-order, chọn Plan A/B","D05 (Data)",["Dashboard smoke test 2 tuần","Sheet lead có lý do","Xác nhận lịch xưởng (P05)"],"CPL ≤ 8,5k ở ít nhất một concept, đủ 30–50 đăng ký mỗi biến thể → pre-order; chọn A hoặc B","CPL 8,5–12k → đổi thông điệp/giá, chạy lại 1 tuần","CPL > 12k sau hai vòng → dừng hoặc đổi phân khúc"],
+  ["C2","A","2027-01-08","C2","Sau pre-order: chốt lô sản xuất","D06 (Data) + P06 (Production)",["Danh sách cọc theo SKU/size","Dải dự báo đã hiệu chỉnh Z","Lịch sản xuất xác nhận"],"Tỷ lệ cọc đạt ở ít nhất một mức giá, dự báo cơ sở trên hòa vốn → đặt lô ~300 sp trước 15/1","Đạt 70–100% → giảm cỡ lô hoặc số SKU","Dưới 70% → không đặt lô, hoàn cọc"],
+  ["C2B","B","2027-01-22","C2","Kiểm hàng và mở bán trước Tết","P06B (Production) + D07B (Data)",["Biên bản QC lô","Đối chiếu cọc với tồn kho","Lịch ngưng giao của hãng vận chuyển"],"Hàng đạt QC, đủ size cho khách cọc → mở bán 25/1","Thiếu size hoặc lỗi nhỏ → bán phần đạt, sửa phần lỗi","Lỗi nặng → không bán trước Tết, hoàn cọc hoặc dời giao"],
+  ["C3","A","2027-03-26","C3","Sau soft launch: mở rộng hay dừng","D08 (Data)",["Dashboard 5 tuần bán","Báo cáo wear-test","Đổi trả, review, mua lại"],"Z ổn định 2 tuần liên tiếp, kịch bản cơ sở trên hòa vốn, CAC ≤ 85k → đặt lô 2","Đạt 70–100% → sửa sản phẩm/giá theo wear-test, lô 2 nhỏ","Dưới 70% hoặc chạm ngưỡng lỗ → dừng, xả tồn"],
+  ["C3B","B","2027-03-12","C3","Sau bán trước Tết + wear-test: mở rộng hay dừng","D08B (Data)",["Dashboard trước và sau Tết","Báo cáo wear-test","Mua lại sau Tết"],"Bán sau Tết vẫn trên hòa vốn (không chỉ nhờ mùa Tết), CAC ≤ 85k → đặt lô 2","Đạt 70–100% → sửa theo wear-test, lô 2 nhỏ","Dưới 70% hoặc chạm ngưỡng lỗ → dừng, xả tồn"],
+];
+const STATUS = { todo: "Chưa làm", doing: "Đang làm", review: "Chờ duyệt", done: "Xong" };
+const SKEYS = ["todo", "doing", "review", "done"];
+const GDEC = { "": "Chưa họp", go: "Go", adj: "Điều chỉnh", no: "No-go" };
+const SHORT = {"F01": "Kick-off", "M01": "Bộ câu hỏi", "D01": "Unit economics, ngưỡng", "P01": "Báo giá 2 xưởng", "S01": "Quét đối thủ trên sàn", "D02": "Quy mô thị trường", "M02": "Phỏng vấn sâu 26–30 người", "M03": "Khảo sát 300–400 phản hồi", "P02": "Chốt xưởng, tech pack v1", "S02": "Thực địa, quảng cáo đối thủ", "P03": "Mẫu vòng 1, chạy thử", "D03": "Analog, dự báo ban đầu", "M05": "Landing + quảng cáo test", "M04": "Persona", "D04": "Báo cáo tổng hợp P1", "P04": "Mẫu v2, ảnh, giá vốn", "S03": "Gian hàng, kịch bản lead", "M06": "Chạy smoke test", "S04": "Chăm lead", "D05": "Dashboard tuần", "P05": "Tech pack v2, giữ slot", "M07": "Pre-order + seeding CLB", "S05": "Nhận cọc, xác nhận size", "D06": "Hiệu chỉnh Z, cỡ lô", "P06": "Chốt lệnh sản xuất", "P07": "Sản xuất lô ~300 sp", "M08": "Cộng đồng, tuyển wear-tester", "D07": "Tồn kho, dòng tiền lô 1", "P08": "Nhận hàng, QC", "S06": "Lên sàn, giao đơn cọc", "M09": "Quảng cáo soft launch", "S07": "Bán hàng, CSKH, đổi trả", "P09": "Wear-test 15–20 runner", "D08": "Báo cáo tuần, cập nhật Z", "P06B": "Đặt + sản xuất lô ngay", "S06B": "Chuẩn bị lên sàn", "D07B": "Đối chiếu cọc với lô", "M09B": "Quảng cáo bán trước Tết", "S07B": "Giao đơn cọc, bán hàng", "M08B": "Tuyển wear-tester", "D08B": "Báo cáo tuần, cập nhật Z", "P09B": "Wear-test sau Tết", "S08B": "Bán tiếp sau Tết"};
+const tasks = T.map(r => ({ short: SHORT[r[0]] || r[6], id: r[0], lane: r[1], plan: r[2], phase: r[3], start: r[4], end: r[5], title: r[6], how: r[7], out: r[8], deps: r[9] }));
+const gates = G.map(r => ({ id: r[0], plan: r[1], date: r[2], code: r[3], title: r[4], by: r[5], inputs: r[6], go: r[7], adj: r[8], no: r[9] }));
+
+const ICON = {
+  bang: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>',
+  cong: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 9-9 9-9-9z"/><path d="M9 12l2 2 4-4" stroke-linecap="round"/></svg>',
+  lich: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  quytac: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14c1.9.8 3 2.9 3 6"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
+};
+const VIEWS = [["bang", "Bảng việc"], ["cong", "Cổng"], ["lich", "Lịch"], ["quytac", "Quy tắc"]];
+const VTITLE = { bang: "Bảng việc", cong: "Cổng quyết định", lich: "Lịch hạn nộp", quytac: "Quy tắc & đội ngũ" };
+
+let plan = "A", view = "bang", laneF = "all", range = "now", col = "doing", colPicked = false, attnF = "";
+// status: id -> {s, link, note, by, at}; appr: id -> {ok, by, at}; log: [{task, act, note, link, by, at}]
+const state = { status: {}, appr: {}, gate: {}, owners: {}, log: [] };
+let db = null, me = null, canWrite = true, isFounder = false, meId = null;
+const names = {};
+const drafts = {};
+let openId = null;
+const TODAY = new Date().toLocaleDateString("sv-SE");
+const ACT = { start: "Bắt đầu làm", submit: "Nộp chờ duyệt", withdraw: "Rút lại để sửa", approve: "Duyệt · Xong", reject: "Trả về", reopen: "Mở lại", todo: "Đặt lại Chưa làm" };
+
+const DAY = 86400000;
+const d0 = new Date(START + "T00:00:00Z").getTime();
+const dIdx = s => Math.round((new Date(s + "T00:00:00Z").getTime() - d0) / DAY);
+const dt = s => new Date(s + "T00:00:00Z");
+const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const fmt = s => { const d = dt(s); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`; };
+const fmtW = s => `${WD[dt(s).getUTCDay()]} ${fmt(s)}`;
+const fmtY = s => { const d = dt(s); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`; };
+const addD = (s, n) => new Date(dt(s).getTime() + n * DAY).toISOString().slice(0, 10);
+const weekStart = i => addD(START, i * 7);
+const weekOf = s => Math.floor(dIdx(s) / 7);
+const NOWW = Math.max(0, Math.min(WEEKS - 1, weekOf(TODAY)));
+const inPlan = x => x.plan === "AB" || x.plan === plan;
+const visT = () => tasks.filter(inPlan);
+const visG = () => gates.filter(inPlan);
+const byId = id => tasks.find(t => t.id === id) || gates.find(g => g.id === id);
+const laneOf = k => LANES.find(l => l.k === k);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ownerTxt = k => (state.owners[k] || "").trim();
+const lastFri = () => plan === "A" ? "2027-03-26" : "2027-03-12";
+function fridays() {
+  const out = [];
+  for (let i = 0; i < WEEKS; i++) {
+    let f = addD(weekStart(i), 4), cls = "", note = "Họp review chiều thứ Sáu";
+    if (f > lastFri()) break;
+    if (f === "2027-01-01") { f = "2026-12-31"; cls = "moved"; note = "Họp review dời sang thứ Năm (Tết Dương lịch)"; }
+    if (f === "2027-02-05") { cls = "skip"; note = "Nghỉ Tết, không họp"; }
+    out.push({ date: f, cls, note });
+  }
+  return out;
+}
+
+function stOf(id) {
+  const s = state.status[id], a = state.appr[id];
+  if (a && a.ok && (!s || (a.at || "") >= (s.at || ""))) return "done";
+  return s ? s.s : "todo";
+}
+const lateDays = t => stOf(t.id) !== "done" && TODAY > t.end ? dIdx(TODAY) - dIdx(t.end) : 0;
+const soonDays = t => { if (stOf(t.id) === "done" || TODAY > t.end) return -1; const d = dIdx(t.end) - dIdx(TODAY); return d <= 2 ? d : -1; };
+function blockers(t) {
+  if (["review", "done"].includes(stOf(t.id))) return [];
+  return t.deps.map(byId).filter(d => d && inPlan(d) && (d.code ? !["go", "adj"].includes(state.gate[d.id] || "") : stOf(d.id) !== "done"));
+}
+const reviewHours = id => { const s = state.status[id]; return s && s.s === "review" && s.at ? (Date.now() - new Date(s.at).getTime()) / 3600000 : 0; };
+const fmtT = iso => { const d = new Date(iso); return isNaN(d) ? "" : `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || "").trim()) ? String(u).trim() : "";
+const nameOf = id => id ? (names[id] || "Thành viên") : "Thành viên";
+const canAct = () => !!db && canWrite;
+function tagsHtml(t, opts) {
+  const L = lateDays(t), S = soonDays(t), B = blockers(t), st = stOf(t.id), h = reviewHours(t.id);
+  let out = "";
+  if (L) out += `<span class="tag late">Quá hạn ${L} ngày</span>`;
+  else if (S >= 0) out += `<span class="tag soon">${S === 0 ? "Hạn hôm nay" : "Còn " + S + " ngày"}</span>`;
+  if (st === "review" && h > 24) out += `<span class="tag late">Chờ duyệt ${Math.floor(h)} giờ</span>`;
+  if (B.length && !(opts && opts.noBlock)) out += `<span class="tag block">Chờ ${B.map(d => d.code ? "cổng " + d.code : d.id).join(", ")}</span>`;
+  return out;
+}
+// Names arrive with the data (byName), so there is nothing to resolve.
+function resolveNames() {}
+
+
+// ---------- board ----------
+function rangeOk(t) {
+  if (range === "all") return true;
+  if (lateDays(t) || stOf(t.id) === "review") return true;
+  let ws, we;
+  if (range === "now") { ws = weekStart(NOWW); we = addD(ws, 13); }
+  else { const i = +range.slice(1); ws = weekStart(i); we = addD(ws, 6); }
+  return t.start <= we && t.end >= ws;
+}
+function attnOk(t) {
+  if (attnF === "review") return stOf(t.id) === "review";
+  if (attnF === "late") return !!lateDays(t);
+  return true;
+}
+const boardTasks = () => visT().filter(t => (laneF === "all" || t.lane === laneF) && rangeOk(t) && attnOk(t));
+
+function renderRange() {
+  const sel = document.getElementById("range");
+  let h = `<option value="now">Tuần này và tuần sau</option><option value="all">Mọi tuần</option>`;
+  for (let i = 0; i <= weekOf(lastFri()); i++) h += `<option value="w${i}">Tuần ${i + 1} · ${fmt(weekStart(i))}–${fmt(addD(weekStart(i), 4))}${i === NOWW ? " (tuần này)" : ""}</option>`;
+  sel.innerHTML = h;
+  if (![...sel.options].some(o => o.value === range)) range = "now";
+  sel.value = range;
+}
+
+function renderAttn() {
+  const v = visT();
+  const rev = v.filter(t => stOf(t.id) === "review").length;
+  const late = v.filter(lateDays).length;
+  const next = visG().filter(g => g.date >= TODAY && !state.gate[g.id]).sort((a, b) => a.date.localeCompare(b.date))[0];
+  const done = v.filter(t => stOf(t.id) === "done").length;
+  let h = `<button type="button" class="pillbtn review" data-attn="review" aria-pressed="${attnF === "review"}"><span class="n num">${rev}</span>chờ duyệt</button>`;
+  h += `<button type="button" class="pillbtn late" data-attn="late" aria-pressed="${attnF === "late"}"><span class="n num">${late}</span>quá hạn</button>`;
+  if (next) { const d = dIdx(next.date) - dIdx(TODAY); h += `<button type="button" class="pillbtn gate" data-id="${next.id}"><span class="dia" aria-hidden="true"></span>Cổng ${next.code} · ${fmtW(next.date)} · ${d === 0 ? "hôm nay" : "còn " + d + " ngày"}</button>`; }
+  h += `<button type="button" class="pillbtn" data-attn="" aria-pressed="false"><span class="n num">${done}/${v.length}</span>việc đã xong</button>`;
+  document.getElementById("attn").innerHTML = h;
+}
+
+function renderLaneChips() {
+  document.getElementById("lanechips").innerHTML = [["all", "Tất cả"]].concat(LANES.map(l => [l.k, l.name])).map(([k, n]) => `<button type="button" class="chip" data-lanef="${k}" aria-pressed="${k === laneF}">${n}</button>`).join("");
+}
+
+function cardHtml(t) {
+  const st = stOf(t.id), s = state.status[t.id], l = laneOf(t.lane);
+  const sub = s && safeUrl(s.link) && st !== "todo";
+  return `<button type="button" class="card ${st}" data-id="${t.id}">
+    <span class="meta"><span class="lane">${l.code}</span><span class="num">${t.id}</span></span>
+    <span class="t">${esc(t.title)}</span>
+    <span class="foot"><span class="due num">${st === "done" ? "Đã duyệt" : "Hạn " + fmtW(t.end)}</span>${tagsHtml(t)}${sub ? `<span class="tag link">${ICON.link}link</span>` : ""}</span>
+  </button>`;
+}
+
+function renderBoard() {
+  const list = boardTasks();
+  const by = { todo: [], doing: [], review: [], done: [] };
+  list.forEach(t => by[stOf(t.id)].push(t));
+  const order = (a, b) => (lateDays(b) - lateDays(a)) || a.end.localeCompare(b.end);
+  SKEYS.forEach(k => by[k].sort(k === "review" ? (a, b) => reviewHours(b.id) - reviewHours(a.id) : order));
+  if (!colPicked && !by[col].length) col = ["review", "doing", "todo", "done"].find(k => by[k].length) || col;
+  document.getElementById("coltabs").innerHTML = SKEYS.map(k => `<button type="button" data-col="${k}" aria-pressed="${k === col}"><b class="num"><i class="sdot s-${k}"></i>${by[k].length}</b>${STATUS[k]}</button>`).join("");
+  const emptyTxt = { todo: "Không có việc chưa bắt đầu trong khoảng này.", doing: "Chưa ai bắt đầu việc nào trong khoảng này.", review: "Không có đầu ra nào đang chờ duyệt.", done: "Chưa có việc nào được duyệt." };
+  document.getElementById("board").innerHTML = SKEYS.map(k => `<section class="col${k === col ? " on" : ""}" aria-label="${STATUS[k]}">
+    <div class="colhead"><i class="sdot s-${k}"></i><h2>${STATUS[k]}</h2><span class="c num">${by[k].length}</span></div>
+    ${by[k].length ? by[k].map(cardHtml).join("") : `<p class="empty">${emptyTxt[k]}</p>`}
+  </section>`).join("");
+}
+
+// ---------- gates ----------
+function renderGates() {
+  document.getElementById("gates").innerHTML = visG().map(g => {
+    const dec = state.gate[g.id] || "";
+    const d = dIdx(g.date) - dIdx(TODAY);
+    return `<article class="gcard">
+      <div class="gh"><span class="gmark ${dec}"><i>${g.code}</i></span><div style="min-width:0"><h3>${esc(g.title)}</h3><span class="muted num" style="font-size:12.5px">${fmtW(g.date)}/${dt(g.date).getUTCFullYear()}${!dec && d >= 0 ? ` · còn ${d} ngày` : ""} · chuẩn bị: ${esc(g.by)}</span></div></div>
+      <div><b style="font-size:12.5px">Đầu vào phải có trước họp</b><ul>${g.inputs.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>
+      <div class="dec"><div class="g"><b>Go</b>${esc(g.go)}</div><div class="a"><b>Điều chỉnh</b>${esc(g.adj)}</div><div class="n"><b>No-go</b>${esc(g.no)}</div></div>
+      <label class="decrow" for="gsel-${g.id}">Quyết định
+        <select data-gate="${g.id}" id="gsel-${g.id}" ${canAct() && isFounder ? "" : "disabled"}>${Object.entries(GDEC).map(([k, v]) => `<option value="${k}" ${k === dec ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+    </article>`;
+  }).join("");
+}
+
+// ---------- schedule ----------
+function renderWeeks() {
+  const maxW = weekOf(lastFri()), fr = fridays();
+  let h = "";
+  for (let i = 0; i <= maxW; i++) {
+    const ws = weekStart(i), we = addD(ws, 6);
+    const due = visT().filter(t => t.end >= ws && t.end <= we).sort((a, b) => a.end.localeCompare(b.end));
+    const gs = visG().filter(g => g.date >= ws && g.date <= we);
+    const f = fr.find(x => x.date >= ws && x.date <= we);
+    const tet = ws <= "2027-02-10" && we >= "2027-02-04";
+    const rows = due.map(t => { const st = stOf(t.id); return `<button type="button" class="wrow" data-id="${t.id}"><i class="sdot s-${st}"></i><span class="lane">${laneOf(t.lane).code}</span><span class="t">${esc(t.short)}</span><span class="r num">${fmtW(t.end)}</span></button>`; }).join("")
+      + gs.map(g => `<button type="button" class="wrow" data-id="${g.id}"><span class="gmark ${state.gate[g.id] || ""}" style="width:22px;height:22px"><i style="font-size:8px">${g.code}</i></span><span class="t">Cổng ${g.code}: ${esc(g.title)}</span><span class="r num">${fmtW(g.date)} · ${GDEC[state.gate[g.id] || ""]}</span></button>`).join("")
+      + (f ? `<div class="wrow meet"><span class="t">${f.note}</span><span class="r num">${f.cls === "skip" ? "" : fmtW(f.date)}</span></div>` : "");
+    h += `<section class="wk${i === NOWW ? " now" : ""}" id="wk-${i}">
+      <div class="wkh"><h3>Tuần ${i + 1}</h3><span class="d num">${fmt(ws)} – ${fmt(addD(ws, 4))}/${dt(ws).getUTCFullYear()}</span>${i === NOWW ? `<span class="now-tag">Tuần này</span>` : ""}${tet ? `<span class="tet">Nghỉ Tết dự kiến</span>` : ""}<span class="d" style="margin-left:auto">${due.length} hạn nộp</span></div>
+      ${rows || `<div class="wrow meet"><span class="t">Không có hạn nộp tuần này.</span></div>`}
+    </section>`;
+  }
+  document.getElementById("weeks").innerHTML = h;
+}
+
+function renderTeam() {
+  document.getElementById("team").innerHTML = LANES.map(l => `<label for="own-${l.k}"><span>${l.full}</span><input type="text" id="own-${l.k}" data-owner="${l.k}" placeholder="Tên người phụ trách" value="${esc(state.owners[l.k] || "")}" ${canAct() && isFounder ? "" : "disabled"}></label>`).join("");
+}
+
+// ---------- detail sheet ----------
+function histHtml(id) {
+  const items = state.log.filter(e => e.task === id);
+  resolveNames(items.map(e => e.by));
+  if (!items.length) return `<p class="muted" style="font-size:12.5px">Chưa có thay đổi nào được ghi.</p>`;
+  return `<ul class="hist">${items.map(e => {
+    const u = safeUrl(e.link);
+    const label = ACT[e.act] || (e.act === "gate" ? "Quyết định: " + (GDEC[e.dec] || "Chưa họp") : e.act);
+    return `<li><span class="muted num">${fmtT(e.at)}</span> · <b>${esc(nameOf(e.by))}</b> · ${esc(label)}${u ? ` · <a href="${esc(u)}" target="_blank" rel="noopener noreferrer">link</a>` : ""}${e.note ? `<span class="note">“${esc(e.note)}”</span>` : ""}</li>`;
+  }).join("")}</ul>`;
+}
+
+function actionsHtml(x) {
+  if (!db) return `<p class="syncnote">Chưa tải được dữ liệu của team, nên chưa cập nhật được. Tải lại trang để thử lại.</p>`;
+  if (!canWrite) return `<p class="syncnote">Tài khoản của bạn hiện chỉ xem được. Nhờ Project Manager kiểm tra quyền.</p>`;
+  const st = stOf(x.id), s = state.status[x.id] || {}, d = drafts[x.id] || {};
+  const linkV = d.link != null ? d.link : (s.link || "");
+  const noteV = d.note || "";
+  const note = (lbl, ph) => `<label class="field" for="pnote">${lbl}<textarea id="pnote" data-draft="note" placeholder="${ph}">${esc(noteV)}</textarea></label>`;
+  const btn = (k, cls) => `<button type="button" class="btn ${cls}" data-act="${k}">${ACT[k]}</button>`;
+  if (st === "todo") return `<div class="btns">${btn("start", "primary")}</div>`;
+  if (st === "doing") return `<label class="field" for="plink">Link đầu ra (bắt buộc khi nộp)<input type="url" id="plink" data-draft="link" inputmode="url" placeholder="https://drive.google.com/…" value="${esc(linkV)}"></label>
+    ${note("Ghi chú cho Project Manager (không bắt buộc)", "Đã làm gì, cần Project Manager chú ý điều gì")}
+    <div class="btns">${btn("submit", "primary")}${btn("todo", "")}</div>`;
+  if (st === "review") return isFounder
+    ? `${note("Ghi chú duyệt (bắt buộc khi Trả về)", "Cần sửa gì, hạn sửa đến khi nào")}<div class="btns">${btn("approve", "ok")}${btn("reject", "bad")}</div>`
+    : `<p class="muted" style="font-size:13px">Đang chờ Project Manager duyệt. Muốn sửa thêm thì rút lại, việc quay về Đang làm.</p><div class="btns">${btn("withdraw", "")}</div>`;
+  return isFounder
+    ? `${note("Lý do mở lại (bắt buộc)", "Vì sao cần làm lại")}<div class="btns">${btn("reopen", "bad")}</div>`
+    : `<p class="muted" style="font-size:13px">Project Manager đã duyệt. Chỉ Project Manager mở lại được việc này.</p>`;
+}
+
+function taskHtml(x) {
+  const l = laneOf(x.lane), st = stOf(x.id), who = ownerTxt(x.lane), s = state.status[x.id] || {}, a = state.appr[x.id];
+  const fri = fridays().find(f => f.date >= x.end && f.cls !== "skip");
+  const pre = x.deps.map(byId).filter(d => d && inPlan(d));
+  const post = visT().filter(t => t.deps.includes(x.id));
+  const gateAfter = visG().find(g => g.date >= x.end);
+  const u = safeUrl(s.link);
+  resolveNames([s.by, a && a.by]);
+  const preDone = d => d.code ? ["go", "adj"].includes(state.gate[d.id] || "") : stOf(d.id) === "done";
+  return `<div class="phead"><span class="lane">${l.code}</span><span class="muted" style="font-size:12.5px">${l.full}${who ? " · " + esc(who) : ""}</span><button type="button" class="close" id="pclose" aria-label="Đóng">${ICON.x}</button></div>
+    <h2 id="ptitle">${esc(x.title)}</h2>
+    <div class="box state sub">
+      <p class="srow"><i class="sdot s-${st}"></i>${STATUS[st]}${tagsHtml(x)}</p>
+      ${u ? `<p style="font-size:13px">Đầu ra đã nộp: <a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a></p>` : ""}
+      ${s.at ? `<p class="muted" style="font-size:12.5px">Cập nhật ${fmtT(s.at)} bởi ${esc(nameOf(s.by))}${st === "done" && a ? ` · Project Manager duyệt ${fmtT(a.at)}` : ""}</p>` : ""}
+      ${s.note && st !== "done" ? `<p style="font-size:13px"><b>Ghi chú gần nhất:</b> ${esc(s.note)}</p>` : ""}
+      ${actionsHtml(x)}
+      <p class="err" id="perr" role="alert"></p>
+    </div>
+    <dl class="kv"><dt>Mã việc</dt><dd>${x.id}</dd><dt>Thời gian</dt><dd class="num">${fmtW(x.start)} → ${fmtW(x.end)} (${dIdx(x.end) - dIdx(x.start) + 1} ngày)</dd><dt>Giai đoạn</dt><dd>${PHASES[x.phase]}</dd><dt>Lộ trình</dt><dd>${x.plan === "AB" ? "Cả Plan A và B" : "Chỉ Plan " + x.plan}</dd></dl>
+    <div class="box"><h4>Đầu ra phải nộp</h4><p><b>${esc(x.out)}</b></p><p class="muted" style="font-size:12.5px">Hạn nộp ${fmtW(x.end)}. Project Manager duyệt trong 24 giờ${fri ? `; chốt muộn nhất ở họp ${fmtW(fri.date)}` : ""}.${gateAfter ? ` Phục vụ cổng ${gateAfter.code} (${fmt(gateAfter.date)}).` : ""}</p></div>
+    <div class="box"><h4>Làm gì</h4><p style="font-size:13.5px">${esc(x.how)}</p></div>
+    ${pre.length ? `<div class="box"><h4>Cần có trước</h4><div class="linklist">${pre.map(d => `<button type="button" class="lchip" data-go="${d.id}">${preDone(d) ? "✓ " : ""}${d.code ? "Cổng " + d.code : d.id + " · " + esc(d.short || d.title)}</button>`).join("")}</div></div>` : ""}
+    ${post.length ? `<div class="box"><h4>Việc chờ đầu ra này</h4><div class="linklist">${post.map(d => `<button type="button" class="lchip" data-go="${d.id}">${d.id} · ${esc(d.short)}</button>`).join("")}</div></div>` : ""}
+    <div class="box"><h4>Lịch sử</h4>${histHtml(x.id)}</div>`;
+}
+
+function gateHtml(x) {
+  const dec = state.gate[x.id] || "";
+  const feeds = visT().filter(t => t.deps.includes(x.id));
+  return `<div class="phead"><span class="gmark ${dec}" style="width:30px;height:30px"><i style="font-size:10px">${x.code}</i></span><span class="muted" style="font-size:12.5px">Cổng quyết định · Project Manager chốt</span><button type="button" class="close" id="pclose" aria-label="Đóng">${ICON.x}</button></div>
+    <h2 id="ptitle">${esc(x.title)}</h2>
+    <dl class="kv"><dt>Ngày</dt><dd class="num">${fmtW(x.date)}/${dt(x.date).getUTCFullYear()}, họp chiều</dd><dt>Chuẩn bị</dt><dd>${esc(x.by)}</dd><dt>Lộ trình</dt><dd>${x.plan === "AB" ? "Cả Plan A và B" : "Plan " + x.plan}</dd></dl>
+    <div class="box state"><label class="decrow" for="pgate">Quyết định <select id="pgate" ${canAct() && isFounder ? "" : "disabled"}>${Object.entries(GDEC).map(([k, v]) => `<option value="${k}" ${k === dec ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+    ${!db ? `<p class="syncnote">Chưa tải được dữ liệu của team.</p>` : isFounder ? "" : `<p class="syncnote">Chỉ Project Manager chốt quyết định ở cổng.</p>`}</div>
+    <div class="box"><h4>Đầu vào</h4><ul style="margin:0;padding-left:18px;font-size:13.5px">${x.inputs.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>
+    <div class="box"><h4>Tiêu chí</h4><p style="font-size:13.5px"><b style="color:var(--green-ink)">Go:</b> ${esc(x.go)}</p><p style="font-size:13.5px"><b>Điều chỉnh:</b> ${esc(x.adj)}</p><p style="font-size:13.5px"><b style="color:var(--late)">No-go:</b> ${esc(x.no)}</p></div>
+    ${feeds.length ? `<div class="box"><h4>Mở khóa các việc</h4><div class="linklist">${feeds.map(t => `<button type="button" class="lchip" data-go="${t.id}">${t.id} · ${esc(t.short)}</button>`).join("")}</div></div>` : ""}
+    <div class="box"><h4>Lịch sử</h4>${histHtml(x.id)}</div>`;
+}
+
+let lastFocus = null;
+function openPanel(id, keepFocus) {
+  const x = byId(id); if (!x) return;
+  const p = document.getElementById("panel");
+  if (p.hidden) lastFocus = document.activeElement;
+  openId = id;
+  p.innerHTML = x.code ? gateHtml(x) : taskHtml(x);
+  const g = p.querySelector("#pgate");
+  if (g) g.addEventListener("change", e => saveGate(x.id, e.target.value));
+  p.querySelector("#pclose").addEventListener("click", closePanel);
+  p.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { openPanel(b.dataset.go); p.scrollTop = 0; }));
+  p.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => act(x.id, b.dataset.act)));
+  p.querySelectorAll("[data-draft]").forEach(i => i.addEventListener("input", () => { (drafts[x.id] = drafts[x.id] || {})[i.dataset.draft] = i.value.slice(0, 2000); }));
+  p.hidden = false; document.getElementById("scrim").hidden = false;
+  if (!keepFocus) p.querySelector("#pclose").focus();
+}
+function refreshPanel() {
+  const p = document.getElementById("panel");
+  if (!openId || p.hidden) return;
+  const a = document.activeElement;
+  if (a && p.contains(a) && a.matches("textarea, input")) return;
+  const top = p.scrollTop;
+  openPanel(openId, true);
+  p.scrollTop = top;
+}
+function closePanel() {
+  openId = null; document.getElementById("panel").hidden = true; document.getElementById("scrim").hidden = true;
+  if (lastFocus && document.contains(lastFocus)) try { lastFocus.focus(); } catch (e) {}
+}
+
+// ---------- server ----------
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || "GET",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) { const er = new Error(data.message || "Lỗi máy chủ"); er.status = res.status; er.code = data.error; er.data = data; throw er; }
+  return data;
+}
+
+let loading = null;
+async function loadState() {
+  if (loading) return loading;
+  loading = (async () => {
+    try {
+      const d = await api("/api/state");
+      const fill = o => { if (o && o.by) names[o.by] = o.byName || o.by.split("@")[0]; };
+      Object.values(d.status).forEach(fill); Object.values(d.approvals).forEach(fill); d.log.forEach(fill);
+      state.status = d.status; state.appr = d.approvals; state.gate = d.gates; state.log = d.log;
+      const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.owner : null;
+      LANES.forEach(l => { if (l.k !== focused) state.owners[l.k] = d.owners[l.k] || ""; });
+      LANES.forEach(l => { const i = document.getElementById("own-" + l.k); if (i && l.k !== focused) i.value = state.owners[l.k] || ""; });
+      if (d.members) renderMembers(d.members, d.pmEmails || []);
+      setSync("Cập nhật lúc " + new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
+      renderAll();
+    } catch (e) {
+      if (e.status === 401) return showLogin();
+      setSync("Mất kết nối máy chủ, sẽ thử lại sau ít giây.");
+    } finally { loading = null; }
+  })();
+  return loading;
+}
+
+// ---------- writes ----------
+let busy = false;
+async function act(id, kind) {
+  if (busy || !canAct()) return;
+  const err = document.getElementById("perr");
+  const s = state.status[id] || {}, d = drafts[id] || {};
+  const note = (d.note || "").trim();
+  if (["approve", "reject", "reopen"].includes(kind) && !isFounder) return;
+  let link = s.link || "";
+  if (kind === "submit") {
+    link = safeUrl(d.link != null ? d.link : s.link);
+    if (!link) { err.textContent = "Dán link đầu ra (bắt đầu bằng http:// hoặc https://) trước khi nộp."; document.getElementById("plink").focus(); return; }
+  }
+  if ((kind === "reject" || kind === "reopen") && !note) { err.textContent = "Ghi chú là bắt buộc để người phụ trách biết cần sửa gì."; document.getElementById("pnote").focus(); return; }
+  busy = true;
+  document.querySelectorAll("#panel [data-act]").forEach(b => b.disabled = true);
+  try {
+    await api(`/api/tasks/${encodeURIComponent(id)}/action`, { method: "POST", body: { kind, link, note } });
+    delete drafts[id];
+    await loadState();
+    if (openId === id) openPanel(id, true);
+  } catch (e) {
+    if (e.status === 401) { busy = false; return showLogin(); }
+    if (e.code === "stale") await loadState();
+    if (openId === id) openPanel(id, true);
+    const er = document.getElementById("perr"); if (er) er.textContent = e.message || "Chưa lưu được, thử lại.";
+  } finally { busy = false; }
+}
+async function saveGate(id, v) {
+  if (!isFounder) return;
+  const prev = state.gate[id];
+  state.gate[id] = v; renderAll();
+  try { await api(`/api/gates/${encodeURIComponent(id)}`, { method: "PUT", body: { d: v } }); await loadState(); }
+  catch (e) { state.gate[id] = prev; renderAll(); onWriteError(e); }
+}
+let ownerTimer = null;
+function saveOwners() {
+  clearTimeout(ownerTimer);
+  ownerTimer = setTimeout(async () => {
+    try { await api("/api/owners", { method: "PUT", body: { ...state.owners } }); document.getElementById("teamnote").textContent = "Đã lưu."; }
+    catch (e) { onWriteError(e); }
+  }, 700);
+}
+function onWriteError(e) {
+  if (e && e.status === 401) return showLogin();
+  setSync(e && e.message ? e.message : "Chưa lưu được thay đổi, thử lại sau ít phút.");
+}
+function setSync(text) { const n = document.getElementById("syncnote"); if (n) n.textContent = text; }
+
+function renderMembers(list, pms) {
+  document.getElementById("members").hidden = false;
+  const rows = pms.map(e => `<li><span>${esc(e)}</span><span class="muted">Project Manager</span></li>`)
+    .concat(list.filter(e => !pms.includes(e)).map(e => `<li><span>${esc(e)}</span><button type="button" class="linkbtn" data-rm="${esc(e)}">Xóa</button></li>`));
+  document.getElementById("mlist").innerHTML = rows.join("") || `<li class="muted">Chưa có thành viên nào.</li>`;
+}
+document.getElementById("maddform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const inp = document.getElementById("memail"), er = document.getElementById("merr");
+  er.textContent = "";
+  try { await api("/api/members", { method: "POST", body: { email: inp.value } }); inp.value = ""; await loadState(); }
+  catch (x) { er.textContent = x.message; }
+});
+document.getElementById("mlist").addEventListener("click", async e => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  try { await api("/api/members/" + encodeURIComponent(b.dataset.rm), { method: "DELETE" }); await loadState(); }
+  catch (x) { document.getElementById("merr").textContent = x.message; }
+});
+// ---------- shell ----------
+function renderNav() {
+  const b = ([k, n]) => `<button type="button" data-view="${k}" ${k === view ? 'aria-current="page"' : ""}>${ICON[k]}<span>${n}</span></button>`;
+  document.getElementById("nav").innerHTML = VIEWS.map(b).join("");
+  document.getElementById("bnav").innerHTML = VIEWS.map(b).join("");
+}
+function showView(v) {
+  if (!VTITLE[v]) v = "bang";
+  view = v;
+  document.querySelectorAll("[data-v]").forEach(s => s.hidden = s.dataset.v !== v);
+  document.getElementById("vtitle").textContent = VTITLE[v];
+  renderNav();
+  if (v === "lich") { const n = document.getElementById("wk-" + NOWW); if (n) requestAnimationFrame(() => n.scrollIntoView({ block: "start" })); }
+}
+function renderAll() {
+  document.getElementById("plannote").textContent = PLANNOTE[plan];
+  renderAttn(); renderLaneChips(); renderBoard(); renderGates(); renderWeeks();
+  refreshPanel();
+}
+function setPlan(p) {
+  plan = p;
+  document.getElementById("planA").setAttribute("aria-pressed", p === "A");
+  document.getElementById("planB").setAttribute("aria-pressed", p === "B");
+  try { localStorage.setItem("mrwf-plan", p); } catch (e) {}
+  renderRange(); renderAll();
+}
+document.getElementById("planA").addEventListener("click", () => setPlan("A"));
+document.getElementById("planB").addEventListener("click", () => setPlan("B"));
+document.getElementById("range").addEventListener("change", e => { range = e.target.value; renderBoard(); });
+window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
+document.addEventListener("click", e => {
+  const v = e.target.closest("[data-view]");
+  if (v) { location.hash = v.dataset.view; showView(v.dataset.view); window.scrollTo(0, 0); return; }
+  if (e.target.closest("#panel")) return;
+  const b = e.target.closest("[data-id]");
+  if (b) { openPanel(b.dataset.id); return; }
+  const a = e.target.closest("[data-attn]");
+  if (a) { const k = a.dataset.attn; attnF = attnF === k ? "" : k; if (attnF === "review") col = "review"; if (attnF === "late") col = "doing"; renderAttn(); renderBoard(); return; }
+  const l = e.target.closest("[data-lanef]");
+  if (l) { laneF = l.dataset.lanef; renderLaneChips(); renderBoard(); return; }
+  const c = e.target.closest("[data-col]");
+  if (c) { col = c.dataset.col; colPicked = true; renderBoard(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openId) closePanel(); });
+document.getElementById("scrim").addEventListener("click", closePanel);
+document.addEventListener("change", e => { if (e.target.dataset.gate) saveGate(e.target.dataset.gate, e.target.value); });
+document.addEventListener("input", e => {
+  const k = e.target.dataset.owner; if (!k || !isFounder) return;
+  state.owners[k] = e.target.value.slice(0, 60);
+  document.getElementById("teamnote").textContent = "Đang lưu…";
+  saveOwners();
+});
+
+// init
+try { const sp = localStorage.getItem("mrwf-plan"); if (sp === "A" || sp === "B") plan = sp; } catch (e) {}
+document.getElementById("planA").setAttribute("aria-pressed", plan === "A");
+document.getElementById("planB").setAttribute("aria-pressed", plan === "B");
+renderRange(); renderTeam(); renderAll(); showView(location.hash.slice(1));
+
+// ---------- sign-in ----------
+let cfg = null, pollTimer = null;
+function showLogin(message) {
+  db = null; me = null; isFounder = false; meId = null;
+  clearInterval(pollTimer);
+  document.getElementById("login").hidden = false;
+  document.getElementById("loginerr").textContent = message || "";
+  if (cfg && cfg.devLogin) document.getElementById("devform").hidden = false;
+  if (cfg && cfg.googleClientId) mountGoogle();
+  else if (cfg && !cfg.devLogin) document.getElementById("loginerr").textContent = "Máy chủ chưa cấu hình GOOGLE_CLIENT_ID.";
+}
+let gisLoaded = false;
+function mountGoogle() {
+  const render = () => {
+    google.accounts.id.initialize({ client_id: cfg.googleClientId, callback: r => signIn("/api/auth/google", { credential: r.credential }) });
+    google.accounts.id.renderButton(document.getElementById("gbtn"), { theme: "outline", size: "large", text: "signin_with", shape: "pill", locale: "vi" });
+  };
+  if (gisLoaded) return render();
+  const s = document.createElement("script");
+  s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+  s.onload = () => { gisLoaded = true; render(); };
+  s.onerror = () => { document.getElementById("loginerr").textContent = "Không tải được nút đăng nhập Google. Kiểm tra mạng rồi tải lại trang."; };
+  document.head.appendChild(s);
+}
+async function signIn(path, body) {
+  const er = document.getElementById("loginerr");
+  er.textContent = "";
+  try { await api(path, { method: "POST", body }); await startApp(); }
+  catch (e) {
+    er.textContent = e.code === "not_allowed"
+      ? `Email ${e.data.email} chưa có trong danh sách thành viên. Nhờ Project Manager thêm email này rồi đăng nhập lại.`
+      : (e.message || "Đăng nhập không thành công, thử lại.");
+  }
+}
+document.getElementById("devform").addEventListener("submit", e => { e.preventDefault(); signIn("/api/auth/dev", { email: document.getElementById("devemail").value }); });
+
+async function startApp() {
+  try { me = await api("/api/me"); } catch (e) { return showLogin(); }
+  db = true; canWrite = true; isFounder = me.role === "pm"; meId = me.email; names[me.email] = me.name;
+  document.getElementById("login").hidden = true;
+  const role = isFounder ? "Project Manager" : "Thành viên";
+  document.getElementById("role").innerHTML = `<span class="me">${me.picture ? `<img src="${esc(me.picture)}" alt="" referrerpolicy="no-referrer">` : ""}<b>${esc(me.name)} · ${role}</b></span><span id="syncnote">Đang tải…</span><button type="button" class="linkbtn" id="logout">Đăng xuất</button>`;
+  document.getElementById("logout").addEventListener("click", async () => { try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {} if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); showLogin(); });
+  document.getElementById("members").hidden = !isFounder;
+  renderTeam();
+  await loadState();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden) loadState(); }, 15000);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && db) loadState(); });
+
+(async () => {
+  try { cfg = await api("/api/config"); } catch (e) { cfg = { googleClientId: "", devLogin: false }; }
+  await startApp();
+})();
+</script>
+</body>
+</html>
