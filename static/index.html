@@ -63,8 +63,9 @@ img { max-width: 100%; }
 .login-card h1 { font-size: 26px; }
 .login-card p { font-size: 13.5px; color: var(--ink-2); }
 .login-card .err { font-size: 13px; }
-#gbtn { min-height: 44px; }
-.devform { display: flex; gap: 8px; width: 100%; }
+.loginform { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.loginform .btn { width: 100%; }
+input[type="password"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%; }
 .me { display: inline-flex; align-items: center; gap: 8px; }
 .me img { width: 26px; height: 26px; border-radius: 50%; }
 .linkbtn { border: 0; background: none; color: var(--cobalt-ink); font-weight: 600; cursor: pointer; padding: 4px 2px; font-size: 12.5px; }
@@ -263,11 +264,15 @@ textarea { min-height: 72px; resize: vertical; }
   <div class="login-card">
     <img src="/logo.jpg" alt="Parrot">
     <h1>Workflow</h1>
-    <p>Đăng nhập bằng tài khoản Google mà Project Manager đã thêm vào danh sách thành viên.</p>
-    <div id="gbtn"></div>
-    <form class="devform" id="devform" hidden>
-      <input type="text" id="devemail" placeholder="email@vidu.com" aria-label="Email đăng nhập thử">
-      <button type="submit" class="btn primary">Vào</button>
+    <p>Nhập tên của bạn và mật khẩu Project Manager đã gửi cho team.</p>
+    <form class="loginform" id="loginform">
+      <label class="field" for="lname">Tên của bạn
+        <input type="text" id="lname" autocomplete="name" maxlength="40" placeholder="Ví dụ: Lan Marketing" required>
+      </label>
+      <label class="field" for="lpass">Mật khẩu
+        <input type="password" id="lpass" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn primary" id="lbtn">Đăng nhập</button>
     </form>
     <p class="err" id="loginerr" role="alert"></p>
   </div>
@@ -346,15 +351,14 @@ textarea { min-height: 72px; resize: vertical; }
         <div class="team" id="team"></div>
         <p class="syncnote" id="teamnote"></p>
       </section>
-      <section id="members" hidden>
-        <h2>Thành viên được đăng nhập</h2>
-        <p class="muted" style="font-size:13px">Thêm email Google của từng người trong team. Người chưa có trong danh sách sẽ không vào được trang.</p>
-        <form class="madd" id="maddform">
-          <input type="text" id="memail" inputmode="email" autocomplete="off" placeholder="ten@gmail.com" aria-label="Email thành viên mới">
-          <button type="submit" class="btn primary">Thêm</button>
-        </form>
-        <p class="err" id="merr" role="alert"></p>
-        <ul class="mlist" id="mlist"></ul>
+      <section>
+        <h2>Đăng nhập</h2>
+        <ul>
+          <li>Mỗi người tự nhập tên khi đăng nhập; tên này hiện trong lịch sử thay đổi.</li>
+          <li>Mật khẩu <b>team</b> cho quyền thành viên: bắt đầu việc, nộp link, rút lại bài nộp.</li>
+          <li>Mật khẩu <b>Project Manager</b> cho thêm quyền duyệt, trả về, chốt cổng và sửa đội ngũ.</li>
+          <li>Đổi mật khẩu trên Render (Environment) thì mọi người dùng mật khẩu cũ bị đăng xuất.</li>
+        </ul>
       </section>
       <section>
         <h2>Giả định cần kiểm lại</h2>
@@ -777,7 +781,6 @@ async function loadState() {
       const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.owner : null;
       LANES.forEach(l => { if (l.k !== focused) state.owners[l.k] = d.owners[l.k] || ""; });
       LANES.forEach(l => { const i = document.getElementById("own-" + l.k); if (i && l.k !== focused) i.value = state.owners[l.k] || ""; });
-      if (d.members) renderMembers(d.members, d.pmEmails || []);
       setSync("Cập nhật lúc " + new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
       renderAll();
     } catch (e) {
@@ -837,24 +840,6 @@ function onWriteError(e) {
 }
 function setSync(text) { const n = document.getElementById("syncnote"); if (n) n.textContent = text; }
 
-function renderMembers(list, pms) {
-  document.getElementById("members").hidden = false;
-  const rows = pms.map(e => `<li><span>${esc(e)}</span><span class="muted">Project Manager</span></li>`)
-    .concat(list.filter(e => !pms.includes(e)).map(e => `<li><span>${esc(e)}</span><button type="button" class="linkbtn" data-rm="${esc(e)}">Xóa</button></li>`));
-  document.getElementById("mlist").innerHTML = rows.join("") || `<li class="muted">Chưa có thành viên nào.</li>`;
-}
-document.getElementById("maddform").addEventListener("submit", async e => {
-  e.preventDefault();
-  const inp = document.getElementById("memail"), er = document.getElementById("merr");
-  er.textContent = "";
-  try { await api("/api/members", { method: "POST", body: { email: inp.value } }); inp.value = ""; await loadState(); }
-  catch (x) { er.textContent = x.message; }
-});
-document.getElementById("mlist").addEventListener("click", async e => {
-  const b = e.target.closest("[data-rm]"); if (!b) return;
-  try { await api("/api/members/" + encodeURIComponent(b.dataset.rm), { method: "DELETE" }); await loadState(); }
-  catch (x) { document.getElementById("merr").textContent = x.message; }
-});
 // ---------- shell ----------
 function renderNav() {
   const b = ([k, n]) => `<button type="button" data-view="${k}" ${k === view ? 'aria-current="page"' : ""}>${ICON[k]}<span>${n}</span></button>`;
@@ -920,35 +905,23 @@ function showLogin(message) {
   db = null; me = null; isFounder = false; meId = null;
   clearInterval(pollTimer);
   document.getElementById("login").hidden = false;
-  document.getElementById("loginerr").textContent = message || "";
-  if (cfg && cfg.devLogin) document.getElementById("devform").hidden = false;
-  if (cfg && cfg.googleClientId) mountGoogle();
-  else if (cfg && !cfg.devLogin) document.getElementById("loginerr").textContent = "Máy chủ chưa cấu hình GOOGLE_CLIENT_ID.";
+  document.getElementById("loginerr").textContent = message || (cfg && cfg.configured === false ? "Máy chủ chưa đặt PM_PASSWORD và TEAM_PASSWORD trên Render." : "");
+  try { const n = localStorage.getItem("pw-name"); if (n && !document.getElementById("lname").value) document.getElementById("lname").value = n; } catch (e) {}
+  setTimeout(() => { const n = document.getElementById("lname"); (n.value ? document.getElementById("lpass") : n).focus(); }, 0);
 }
-let gisLoaded = false;
-function mountGoogle() {
-  const render = () => {
-    google.accounts.id.initialize({ client_id: cfg.googleClientId, callback: r => signIn("/api/auth/google", { credential: r.credential }) });
-    google.accounts.id.renderButton(document.getElementById("gbtn"), { theme: "outline", size: "large", text: "signin_with", shape: "pill", locale: "vi" });
-  };
-  if (gisLoaded) return render();
-  const s = document.createElement("script");
-  s.src = "https://accounts.google.com/gsi/client"; s.async = true;
-  s.onload = () => { gisLoaded = true; render(); };
-  s.onerror = () => { document.getElementById("loginerr").textContent = "Không tải được nút đăng nhập Google. Kiểm tra mạng rồi tải lại trang."; };
-  document.head.appendChild(s);
-}
-async function signIn(path, body) {
-  const er = document.getElementById("loginerr");
-  er.textContent = "";
-  try { await api(path, { method: "POST", body }); await startApp(); }
-  catch (e) {
-    er.textContent = e.code === "not_allowed"
-      ? `Email ${e.data.email} chưa có trong danh sách thành viên. Nhờ Project Manager thêm email này rồi đăng nhập lại.`
-      : (e.message || "Đăng nhập không thành công, thử lại.");
-  }
-}
-document.getElementById("devform").addEventListener("submit", e => { e.preventDefault(); signIn("/api/auth/dev", { email: document.getElementById("devemail").value }); });
+document.getElementById("loginform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = document.getElementById("lname").value.trim(), pass = document.getElementById("lpass");
+  const er = document.getElementById("loginerr"), btn = document.getElementById("lbtn");
+  er.textContent = ""; btn.disabled = true;
+  try {
+    await api("/api/auth/login", { method: "POST", body: { name, password: pass.value } });
+    try { localStorage.setItem("pw-name", name); } catch (x) {}
+    pass.value = "";
+    await startApp();
+  } catch (x) { er.textContent = x.message || "Đăng nhập không thành công, thử lại."; pass.select(); }
+  finally { btn.disabled = false; }
+});
 
 async function startApp() {
   try { me = await api("/api/me"); } catch (e) { return showLogin(); }
@@ -956,8 +929,7 @@ async function startApp() {
   document.getElementById("login").hidden = true;
   const role = isFounder ? "Project Manager" : "Thành viên";
   document.getElementById("role").innerHTML = `<span class="me">${me.picture ? `<img src="${esc(me.picture)}" alt="" referrerpolicy="no-referrer">` : ""}<b>${esc(me.name)} · ${role}</b></span><span id="syncnote">Đang tải…</span><button type="button" class="linkbtn" id="logout">Đăng xuất</button>`;
-  document.getElementById("logout").addEventListener("click", async () => { try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {} if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); showLogin(); });
-  document.getElementById("members").hidden = !isFounder;
+  document.getElementById("logout").addEventListener("click", async () => { try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {} showLogin(); });
   renderTeam();
   await loadState();
   clearInterval(pollTimer);
@@ -966,7 +938,7 @@ async function startApp() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden && db) loadState(); });
 
 (async () => {
-  try { cfg = await api("/api/config"); } catch (e) { cfg = { googleClientId: "", devLogin: false }; }
+  try { cfg = await api("/api/config"); } catch (e) { cfg = {}; }
   await startApp();
 })();
 </script>
