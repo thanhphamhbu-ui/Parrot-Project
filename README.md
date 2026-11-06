@@ -1,65 +1,56 @@
 # Parrot Workflow
 
-Bảng Kanban cho lộ trình Research → Test → Soft launch của Parrot. Team đăng nhập bằng Google, nộp link đầu ra, Project Manager duyệt hoặc trả về, chốt các cổng C0–C3.
+Bảng Kanban cho lộ trình Research → Test → Soft launch của Parrot. Team đăng nhập bằng tên và mật khẩu chung, nộp link đầu ra; Project Manager duyệt hoặc trả về và chốt các cổng C0–C3.
 
 - Backend: Python (Flask), chạy bằng gunicorn.
 - Dữ liệu: Postgres trên Render. Khi chạy ở máy (không có `DATABASE_URL`), app tự dùng file SQLite `local.db`.
-- Giao diện: `static/index.html` (một file), logo ở `static/logo.jpg`.
+- Giao diện: `static/index.html`, logo ở `static/logo.jpg`.
 
-## Cấu trúc
+## Đăng nhập và phân quyền
 
-| File | Vai trò |
-|---|---|
-| `app.py` | API, đăng nhập Google, phân quyền, lưu dữ liệu |
-| `static/index.html` | Toàn bộ giao diện |
-| `render.yaml` | Cấu hình Render: 1 web service + 1 database Postgres |
-| `requirements.txt` | Thư viện Python |
-| `.env.example` | Danh sách biến môi trường cần điền |
+Có hai mật khẩu, do bạn đặt khi tạo service trên Render:
 
-## Biến môi trường
-
-| Biến | Bắt buộc | Ý nghĩa |
+| Mật khẩu | Ai dùng | Được làm gì |
 |---|---|---|
-| `GOOGLE_CLIENT_ID` | Có | OAuth Client ID loại *Web application* từ Google Cloud |
-| `PM_EMAILS` | Có | Email Google của Project Manager, nhiều email thì cách nhau bằng dấu phẩy |
-| `SESSION_SECRET` | Có | Render tự tạo khi deploy bằng `render.yaml` |
-| `DATABASE_URL` | Có trên Render | Render tự điền từ database |
-| `DEV_LOGIN` | Không | Chỉ dùng khi chạy ở máy: `1` cho phép đăng nhập thử bằng email, không cần Google. Bị bỏ qua trên Render |
+| `PM_PASSWORD` | Project Manager | Mọi việc của thành viên, cộng thêm duyệt, trả về, mở lại việc, chốt cổng, sửa tên đội ngũ |
+| `TEAM_PASSWORD` | Cả team | Bắt đầu việc, nộp link đầu ra, rút lại bài nộp |
 
-Thành viên thường không cần khai báo trong biến môi trường: Project Manager thêm email của họ ngay trong trang (tab **Quy tắc** → **Thành viên được đăng nhập**).
+- Mỗi người tự gõ tên khi đăng nhập. Tên đó hiện trong lịch sử thay đổi.
+- Phiên đăng nhập giữ trong 30 ngày.
+- Đổi một mật khẩu trên Render thì những ai đang dùng mật khẩu cũ bị đăng xuất.
+- Nhập sai quá 20 lần trong 10 phút từ cùng một mạng thì bị khóa tạm 10 phút.
+- Mọi quyền đều được kiểm tra ở máy chủ.
 
 ## Deploy lên Render
 
-### Bước 1. Tạo Google OAuth Client ID
-1. Vào <https://console.cloud.google.com/> và tạo một project, ví dụ `parrot-workflow`.
-2. **APIs & Services → OAuth consent screen**: chọn *External*, điền tên app và email hỗ trợ. Ở mục *Test users*, thêm email của cả team. Hoặc bấm *Publish app* để mọi tài khoản Google đều đăng nhập được; app vẫn chỉ cho vào những email có trong danh sách thành viên.
-3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
-   - Application type: **Web application**
-   - Authorized JavaScript origins: `https://parrot-workflow.onrender.com`. Đây là tên dự kiến; nếu Render cấp địa chỉ khác thì sửa lại ở bước 4.
-4. Chép **Client ID**, dạng `xxxx.apps.googleusercontent.com`.
+### Bước 1. Đưa code lên GitHub
+1. Đăng nhập <https://github.com>, bấm **+** → **New repository**.
+2. Tên `parrot-workflow`, chọn **Private**, **không** tick *Add a README file* → **Create repository**.
+3. Bấm dòng **uploading an existing file**.
+4. Giải nén file zip. Mở thư mục vừa giải nén, chọn tất cả (Ctrl + A), **kéo các file bên trong** vào trình duyệt, kể cả thư mục `static`.
+5. Kiểm tra danh sách có `app.py`, `render.yaml`, `requirements.txt`, `README.md`, `.gitignore`, `.env.example`, `static/index.html`, `static/logo.jpg` → **Commit changes**.
+6. Ở trang chính của repo, `render.yaml` phải nằm ngay ngoài cùng, không nằm trong thư mục con.
 
-### Bước 2. Đưa code lên GitHub
-Máy hiện chưa cài git, nên cách nhanh nhất là upload qua trình duyệt:
-1. Tạo repository mới trên GitHub, ví dụ `parrot-workflow`. Nên để **Private**.
-2. Bấm **uploading an existing file**, kéo **toàn bộ nội dung bên trong** thư mục `workflow-web` vào: `app.py`, `render.yaml`, `requirements.txt`, `README.md`, `.gitignore`, `.env.example` và thư mục `static`. `render.yaml` phải nằm ở gốc repo.
-3. Bấm **Commit changes**.
+### Bước 2. Tạo service trên Render
+1. Vào <https://dashboard.render.com>, chọn **Sign up with GitHub**.
+2. **New +** → **Blueprint** → **Connect GitHub** → cho phép Render truy cập repo `parrot-workflow` → **Connect**.
+3. **Blueprint Name:** `parrot-workflow`, **Branch:** `main`.
+4. Render liệt kê web service `parrot-workflow` và database `parrot-workflow-db`, rồi hỏi 2 biến:
+   - `PM_PASSWORD`: mật khẩu riêng của Project Manager
+   - `TEAM_PASSWORD`: mật khẩu chung cho cả team
 
-### Bước 3. Tạo service trên Render
-1. Vào <https://dashboard.render.com/> → **New → Blueprint** → kết nối GitHub → chọn repo `parrot-workflow`.
-2. Render đọc `render.yaml` và tạo service `parrot-workflow` cùng database `parrot-workflow-db`.
-3. Điền hai biến Render hỏi:
-   - `GOOGLE_CLIENT_ID`: Client ID ở bước 1
-   - `PM_EMAILS`: email Google của Project Manager
-4. Bấm **Apply** và chờ build xong (vài phút). Mở `https://<tên-service>.onrender.com/healthz`, thấy chữ `ok` là chạy.
+   Đặt hai mật khẩu khác nhau, mỗi cái ít nhất 10 ký tự.
+5. Bấm **Apply** / **Deploy Blueprint**, chờ 3–5 phút. Trong tab **Logs**, khi thấy *Your service is live* là app đã chạy.
+6. Địa chỉ trang nằm ở đầu trang service, dạng `https://parrot-workflow.onrender.com`. Mở `/healthz` ở địa chỉ đó, thấy chữ `ok` là app chạy được.
 
-### Bước 4. Hoàn tất
-1. Nếu địa chỉ Render khác với địa chỉ đã khai ở bước 1, thêm địa chỉ thật vào *Authorized JavaScript origins* rồi đợi vài phút.
-2. Project Manager mở trang, đăng nhập Google, vào tab **Quy tắc** → **Thành viên được đăng nhập** và thêm email của từng người.
-3. Gửi link cho team.
+### Bước 3. Dùng
+1. Project Manager mở trang, nhập tên và `PM_PASSWORD`.
+2. Gửi link trang và `TEAM_PASSWORD` cho team qua kênh riêng (Zalo, tin nhắn), không đăng công khai.
+3. Đổi mật khẩu sau này: Render → service `parrot-workflow` → **Environment** → sửa giá trị → **Save, rebuild and deploy**.
 
 ## Lưu ý về gói miễn phí của Render
-- **Database miễn phí có hạn dùng**: theo chính sách hiện tại của Render, Postgres gói free bị xóa sau một thời gian ngắn (khoảng 30 ngày). Nếu dùng thật, nâng database lên gói trả phí trước khi hết hạn để không mất dữ liệu. Kiểm tra lại trên trang giá của Render.
-- **Web service miễn phí sẽ "ngủ"** khi không có ai truy cập. Lần mở đầu tiên sau đó phải chờ khoảng một phút. Gói trả phí thấp nhất không bị ngủ.
+- **Database miễn phí có hạn dùng ngắn** (khoảng 30 ngày theo chính sách hiện tại của Render). Nếu dùng thật, vào `parrot-workflow-db` → **Upgrade** sang gói trả phí trước khi hết hạn để không mất dữ liệu. Kiểm tra lại trên trang giá của Render.
+- **Web service miễn phí sẽ "ngủ"** khi không ai truy cập. Lần mở đầu tiên sau đó phải chờ khoảng một phút.
 
 ## Chạy thử ở máy
 
@@ -67,14 +58,17 @@ Máy hiện chưa cài git, nên cách nhanh nhất là upload qua trình duyệ
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-set DEV_LOGIN=1
-set PM_EMAILS=pm@test.local
 python app.py
 ```
 
-Mở <http://127.0.0.1:5000>, nhập `pm@test.local` vào ô đăng nhập thử. Dữ liệu lưu trong `local.db` (đã nằm trong `.gitignore`).
+Mở <http://127.0.0.1:5000>. Khi chưa đặt biến môi trường, mật khẩu thử là `pm123` (Project Manager) và `team123` (thành viên). Dữ liệu lưu trong `local.db`.
 
-## Phân quyền
-- **Project Manager** (email trong `PM_EMAILS`): duyệt hoặc trả về đầu ra, mở lại việc đã xong, chốt cổng, sửa đội ngũ, thêm và xóa thành viên.
-- **Thành viên** (email do PM thêm): bắt đầu việc, nộp link, rút lại bài nộp.
-- Mọi quyền đều được kiểm tra ở máy chủ, không chỉ ở giao diện.
+## Cấu trúc
+
+| File | Vai trò |
+|---|---|
+| `app.py` | API, đăng nhập, phân quyền, lưu dữ liệu |
+| `static/index.html` | Toàn bộ giao diện |
+| `render.yaml` | Cấu hình Render: 1 web service + 1 database Postgres |
+| `requirements.txt` | Thư viện Python |
+| `.env.example` | Danh sách biến môi trường |

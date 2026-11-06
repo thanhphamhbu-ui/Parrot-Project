@@ -21,11 +21,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 IS_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 SQLITE_PATH = os.environ.get("SQLITE_PATH", os.path.join(BASE_DIR, "local.db"))
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
-PM_EMAILS = {e.strip().lower() for e in os.environ.get("PM_EMAILS", "").split(",") if e.strip()}
 ON_RENDER = bool(os.environ.get("RENDER"))
-# Local-only shortcut that skips Google; never active on Render.
-DEV_LOGIN = os.environ.get("DEV_LOGIN") == "1" and not ON_RENDER
+# Two shared passwords, set in Render → Environment. Local runs get simple defaults.
+PM_PASSWORD = os.environ.get("PM_PASSWORD", "") or ("" if ON_RENDER else "pm123")
+TEAM_PASSWORD = os.environ.get("TEAM_PASSWORD", "") or ("" if ON_RENDER else "team123")
 SECRET = os.environ.get("SESSION_SECRET") or ""
 if not SECRET:
     if ON_RENDER:
@@ -36,7 +35,6 @@ COOKIE = "pw_session"
 MAX_AGE = 30 * 24 * 3600
 TASK_RE = re.compile(r"^[A-Z][0-9]{2}B?$")
 GATE_RE = re.compile(r"^C[0-3]B?$")
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 URL_RE = re.compile(r"^https?://\S+$", re.I)
 LANES = {"F", "M", "P", "S", "D"}
 GATE_DEC = {"", "go", "adj", "no"}
@@ -60,8 +58,6 @@ SCHEMA = [
     "CREATE TABLE IF NOT EXISTS gates (gate_id TEXT PRIMARY KEY, d TEXT NOT NULL, by_email TEXT, by_name TEXT, at TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS owners (lane TEXT PRIMARY KEY, name TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS log (id TEXT PRIMARY KEY, task TEXT NOT NULL, act TEXT NOT NULL, decision TEXT, note TEXT, link TEXT, by_email TEXT, by_name TEXT, at TEXT NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, added_by TEXT, at TEXT NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, name TEXT, picture TEXT, last_login TEXT)",
 ]
 
 
@@ -122,36 +118,39 @@ def unb64(text):
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def make_token(email):
-    body = b64(json.dumps({"e": email, "x": int(time.time()) + MAX_AGE}).encode())
-    sig = b64(hmac.new(SECRET.encode(), body.encode(), hashlib.sha256).digest())
+def role_key(role):
+    # Changing a password on Render signs everyone with that role out.
+    pw = PM_PASSWORD if role == "pm" else TEAM_PASSWORD
+    return f"{SECRET}:{role}:{pw}".encode()
+
+
+def make_token(name, role):
+    body = b64(json.dumps({"n": name, "r": role, "x": int(time.time()) + MAX_AGE}).encode())
+    sig = b64(hmac.new(role_key(role), body.encode(), hashlib.sha256).digest())
     return f"{body}.{sig}"
 
 
 def read_token(token):
     try:
         body, sig = token.split(".", 1)
-        good = b64(hmac.new(SECRET.encode(), body.encode(), hashlib.sha256).digest())
-        if not hmac.compare_digest(sig, good):
-            return None
         data = json.loads(unb64(body))
-        return data["e"] if data["x"] > time.time() else None
+        if data.get("r") not in ("pm", "member"):
+            return None
+        good = b64(hmac.new(role_key(data["r"]), body.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(sig, good) or data["x"] <= time.time():
+            return None
+        return data
     except Exception:
         return None
 
 
-def is_allowed(email):
-    return email in PM_EMAILS or one("SELECT email FROM members WHERE email = ?", (email,)) is not None
-
-
 def current_user():
-    email = read_token(request.cookies.get(COOKIE, ""))
-    if not email or not is_allowed(email):
+    data = read_token(request.cookies.get(COOKIE, ""))
+    if not data:
         return None
-    u = one("SELECT email, name, picture FROM users WHERE email = ?", (email,)) or {"email": email, "name": "", "picture": ""}
-    u["role"] = "pm" if email in PM_EMAILS else "member"
-    u["name"] = u.get("name") or email.split("@")[0]
-    return u
+    name = str(data.get("n") or "").strip()[:40]
+    # "email" is the stable id stored with each change; here it is the display name.
+    return {"email": name, "name": name, "picture": "", "role": data["r"]}
 
 
 def err(code, msg, status):
@@ -163,17 +162,6 @@ def guard():
     # Writes must come from the page's own fetch() calls (simple CSRF guard).
     if request.method not in ("GET", "HEAD") and request.headers.get("X-Requested-With") != "fetch":
         return err("bad_request", "Thiếu header của ứng dụng.", 400)
-
-
-def login_response(email, name, picture):
-    q(
-        "INSERT INTO users (email, name, picture, last_login) VALUES (?, ?, ?, ?) "
-        "ON CONFLICT (email) DO UPDATE SET name = excluded.name, picture = excluded.picture, last_login = excluded.last_login",
-        (email, name, picture, now_iso()),
-    )
-    resp = jsonify({"ok": True})
-    resp.set_cookie(COOKIE, make_token(email), max_age=MAX_AGE, httponly=True, secure=ON_RENDER, samesite="Lax")
-    return resp
 
 
 # ---------- pages ----------
@@ -195,42 +183,43 @@ def logo():
 
 
 # ---------- auth ----------
+FAILS = {}  # ip -> recent failed-login timestamps (per worker, in memory)
+
+
+def too_many_fails(ip):
+    recent = [t for t in FAILS.get(ip, []) if t > time.time() - 600]
+    FAILS[ip] = recent
+    # Generous limit: a whole office may share one public IP.
+    return len(recent) >= 20
+
+
 @app.get("/api/config")
 def config():
-    return jsonify({"googleClientId": GOOGLE_CLIENT_ID, "devLogin": DEV_LOGIN, "pmConfigured": bool(PM_EMAILS)})
+    return jsonify({"configured": bool(PM_PASSWORD and TEAM_PASSWORD)})
 
 
-@app.post("/api/auth/google")
-def auth_google():
-    if not GOOGLE_CLIENT_ID:
-        return err("not_configured", "Máy chủ chưa có GOOGLE_CLIENT_ID.", 500)
-    cred = (request.get_json(silent=True) or {}).get("credential", "")
-    try:
-        from google.auth.transport import requests as grequests
-        from google.oauth2 import id_token
-
-        info = id_token.verify_oauth2_token(cred, grequests.Request(), GOOGLE_CLIENT_ID)
-    except Exception:
-        return err("bad_token", "Không xác minh được tài khoản Google, thử đăng nhập lại.", 401)
-    email = (info.get("email") or "").lower()
-    if not email or not info.get("email_verified"):
-        return err("bad_token", "Tài khoản Google này chưa xác minh email.", 401)
-    if not is_allowed(email):
-        return jsonify({"error": "not_allowed", "email": email, "message": "Email này chưa được cấp quyền."}), 403
-    return login_response(email, info.get("name") or "", info.get("picture") or "")
-
-
-@app.post("/api/auth/dev")
-def auth_dev():
-    if not DEV_LOGIN:
-        return err("not_found", "Không có.", 404)
+@app.post("/api/auth/login")
+def login():
+    if not (PM_PASSWORD and TEAM_PASSWORD):
+        return err("not_configured", "Máy chủ chưa đặt PM_PASSWORD và TEAM_PASSWORD.", 500)
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0]).strip()
+    if too_many_fails(ip):
+        return err("rate_limited", "Sai mật khẩu quá nhiều lần. Đợi 10 phút rồi thử lại.", 429)
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    if not EMAIL_RE.match(email):
-        return err("bad_request", "Email không hợp lệ.", 400)
-    if not is_allowed(email):
-        return jsonify({"error": "not_allowed", "email": email, "message": "Email này chưa được cấp quyền."}), 403
-    return login_response(email, email.split("@")[0], "")
+    name = " ".join(str(data.get("name") or "").split())[:40]
+    pw = str(data.get("password") or "")
+    if not name:
+        return err("bad_request", "Nhập tên của bạn để team biết ai cập nhật việc.", 400)
+    if hmac.compare_digest(pw.encode(), PM_PASSWORD.encode()):
+        role = "pm"
+    elif hmac.compare_digest(pw.encode(), TEAM_PASSWORD.encode()):
+        role = "member"
+    else:
+        FAILS.setdefault(ip, []).append(time.time())
+        return err("bad_password", "Mật khẩu không đúng.", 401)
+    resp = jsonify({"ok": True})
+    resp.set_cookie(COOKIE, make_token(name, role), max_age=MAX_AGE, httponly=True, secure=ON_RENDER, samesite="Lax")
+    return resp
 
 
 @app.post("/api/auth/logout")
@@ -272,9 +261,6 @@ def state():
             for r in q("SELECT * FROM log ORDER BY at DESC LIMIT 800")
         ],
     }
-    if u["role"] == "pm":
-        out["members"] = [r["email"] for r in q("SELECT email FROM members ORDER BY email")]
-        out["pmEmails"] = sorted(PM_EMAILS)
     return jsonify(out)
 
 
@@ -367,27 +353,6 @@ def set_owners():
                 "INSERT INTO owners (lane, name) VALUES (?, ?) ON CONFLICT (lane) DO UPDATE SET name = excluded.name",
                 (lane, name.strip()[:60]),
             )
-    return jsonify({"ok": True})
-
-
-@app.post("/api/members")
-def add_member():
-    u = current_user()
-    if not u or u["role"] != "pm":
-        return err("forbidden", "Chỉ Project Manager thêm được thành viên.", 403)
-    email = str((request.get_json(silent=True) or {}).get("email") or "").strip().lower()
-    if not EMAIL_RE.match(email) or len(email) > 200:
-        return err("bad_request", "Email không hợp lệ.", 400)
-    q("INSERT INTO members (email, added_by, at) VALUES (?, ?, ?) ON CONFLICT (email) DO NOTHING", (email, u["email"], now_iso()))
-    return jsonify({"ok": True})
-
-
-@app.delete("/api/members/<path:email>")
-def remove_member(email):
-    u = current_user()
-    if not u or u["role"] != "pm":
-        return err("forbidden", "Chỉ Project Manager xóa được thành viên.", 403)
-    q("DELETE FROM members WHERE email = ?", (email.strip().lower(),))
     return jsonify({"ok": True})
 
 
