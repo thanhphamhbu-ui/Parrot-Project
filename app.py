@@ -27,11 +27,16 @@ ON_RENDER = bool(os.environ.get("RENDER"))
 # otherwise make every login fail with "wrong password".
 PM_PASSWORD = os.environ.get("PM_PASSWORD", "").strip() or ("" if ON_RENDER else "pm123")
 TEAM_PASSWORD = os.environ.get("TEAM_PASSWORD", "").strip() or ("" if ON_RENDER else "team123")
-SECRET = os.environ.get("SESSION_SECRET") or ""
+# SESSION_SECRET is optional. Without it, the key is derived from the two
+# passwords, so every worker and every restart agrees on it.
+SECRET = os.environ.get("SESSION_SECRET", "").strip()
 if not SECRET:
-    if ON_RENDER:
-        raise RuntimeError("SESSION_SECRET is required on Render")
-    SECRET = secrets.token_hex(32)
+    if PM_PASSWORD and TEAM_PASSWORD:
+        SECRET = hashlib.sha256(f"parrot-session:{PM_PASSWORD}:{TEAM_PASSWORD}".encode()).hexdigest()
+    else:
+        SECRET = secrets.token_hex(32)
+if ON_RENDER and not IS_PG:
+    print("CẢNH BÁO: chưa đặt DATABASE_URL. Dữ liệu đang lưu tạm trong SQLite và sẽ mất sau mỗi lần deploy.", flush=True)
 
 COOKIE = "pw_session"
 MAX_AGE = 30 * 24 * 3600
@@ -70,7 +75,7 @@ def get_db():
             import psycopg
             from psycopg.rows import dict_row
 
-            g.db = psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=True)
+            g.db = psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=True, connect_timeout=10)
         else:
             conn = sqlite3.connect(SQLITE_PATH, isolation_level=None)
             conn.row_factory = sqlite3.Row
@@ -216,8 +221,7 @@ def config():
 def health():
     # Open this URL in a browser to see what is wrong without reading the logs.
     out = {"app": "ok", "passwordsSet": bool(PM_PASSWORD and TEAM_PASSWORD),
-           "sessionSecretSet": bool(os.environ.get("SESSION_SECRET")),
-           "database": "postgres" if IS_PG else "sqlite"}
+           "database": "postgres" if IS_PG else ("sqlite TẠM – thiếu DATABASE_URL, dữ liệu mất khi deploy" if ON_RENDER else "sqlite")}
     try:
         q("SELECT 1 AS ok")
         out["db"] = "ok"
@@ -387,4 +391,5 @@ def set_owners():
 init_db()
 
 if __name__ == "__main__":
+    # Local test only. On Render the Start Command is: gunicorn app:app
     app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), debug=False)
